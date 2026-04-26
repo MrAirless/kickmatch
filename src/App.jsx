@@ -41,51 +41,28 @@ function StandortModal({ onClose, onSave }) {
       async (pos) => {
         const { latitude, longitude } = pos.coords;
         try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
-          );
+          const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`);
           const data = await res.json();
-          const stadt =
-            data.address.city ||
-            data.address.town ||
-            data.address.village ||
-            data.address.county ||
-            "Unbekannt";
+          const stadt = data.address.city || data.address.town || data.address.village || data.address.county || "Unbekannt";
           onSave({ lat: latitude, lng: longitude, label: stadt });
         } catch {
           onSave({ lat: latitude, lng: longitude, label: "GPS-Standort" });
         }
         setLoading(false);
       },
-      () => {
-        setError("GPS-Zugriff verweigert. Bitte manuell eingeben.");
-        setLoading(false);
-      }
+      () => { setError("GPS-Zugriff verweigert. Bitte manuell eingeben."); setLoading(false); }
     );
   }
 
   async function useStadt() {
-    if (!stadtInput.trim()) {
-      setError("Bitte eine Stadt oder PLZ eingeben.");
-      return;
-    }
+    if (!stadtInput.trim()) { setError("Bitte eine Stadt oder PLZ eingeben."); return; }
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(stadtInput)}&format=json&limit=1&countrycodes=de`
-      );
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(stadtInput)}&format=json&limit=1&countrycodes=de`);
       const data = await res.json();
-      if (!data.length) {
-        setError("Ort nicht gefunden. Bitte anders eingeben.");
-        setLoading(false);
-        return;
-      }
-      onSave({
-        lat: parseFloat(data[0].lat),
-        lng: parseFloat(data[0].lon),
-        label: stadtInput.trim(),
-      });
+      if (!data.length) { setError("Ort nicht gefunden. Bitte anders eingeben."); setLoading(false); return; }
+      onSave({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), label: stadtInput.trim() });
     } catch {
       setError("Fehler bei der Suche. Bitte erneut versuchen.");
     }
@@ -139,6 +116,7 @@ function Badge({ children, color }) {
     blue:   { background: "#E6F1FB", color: "#0C447C" },
     green:  { background: "#EAF3DE", color: "#27500A" },
     gray:   { background: "#F1EFE8", color: "#444441" },
+    orange: { background: "#FAEEDA", color: "#633806" },
   };
   const s = styles[color] || styles.gray;
   return <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, ...s }}>{children}</span>;
@@ -166,6 +144,10 @@ function GameCard({ game, userLocation, onClick }) {
           <Badge color={game.type === "angebot" ? "offer" : "search"}>{game.type === "angebot" ? "Angebot" : "Anfrage"}</Badge>
           <Badge color="blue">{game.jugend.split(" ")[0]}</Badge>
           {game.status === "gebucht" && <Badge color="green">Gebucht</Badge>}
+          {/* Umkreis-Badge bei Anfragen */}
+          {game.type === "anfrage" && game.umkreis_km && (
+            <Badge color="orange">📍 max. {game.umkreis_km} km</Badge>
+          )}
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           {dist !== null && <Badge color="gray">{dist} km</Badge>}
@@ -238,6 +220,17 @@ function DetailModal({ game, userLocation, onClose, onBook }) {
           </div>
         </div>
 
+        {/* Umkreis bei Anfragen anzeigen */}
+        {game.type === "anfrage" && game.umkreis_km && (
+          <div style={{ display: "flex", gap: 12, padding: "9px 0", borderBottom: "0.5px solid #f0f0f0" }}>
+            <div style={{ fontSize: 15, width: 20, flexShrink: 0 }}>🗺️</div>
+            <div>
+              <div style={{ fontSize: 11, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.05em" }}>Gewünschter Umkreis</div>
+              <div style={{ fontSize: 14, color: "#1a1a1a" }}>Maximal {game.umkreis_km} km</div>
+            </div>
+          </div>
+        )}
+
         {mapsUrl && game.status !== "gebucht" && (
           <a href={mapsUrl} target="_blank" rel="noreferrer" style={{ display: "block", width: "100%", padding: 11, background: "#378ADD", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer", marginTop: 12, textAlign: "center", textDecoration: "none" }}>
             Navigation starten (Google Maps)
@@ -276,16 +269,13 @@ function BookingModal({ game, onClose, onConfirm }) {
     <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 101, padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: "white", borderRadius: 16, padding: "1.5rem", maxWidth: 440, width: "100%", maxHeight: "85vh", overflowY: "auto", position: "relative" }}>
         <button onClick={onClose} style={{ position: "absolute", top: 12, right: 12, width: 28, height: 28, borderRadius: "50%", border: "0.5px solid #e5e5e5", background: "#f5f5f5", cursor: "pointer", fontSize: 13, color: "#666" }}>✕</button>
-
         <div style={{ marginBottom: 16 }}>
           <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 4 }}>Buchung abschließen</div>
           <div style={{ fontSize: 13, color: "#888" }}>{game.verein} · {formatDate(game.datum)} · {game.uhrzeit} Uhr</div>
         </div>
-
         <div style={{ background: "#f5f5f5", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#666" }}>
           Bitte gib deine Kontaktdaten ein, damit {game.trainer_name} dich erreichen kann.
         </div>
-
         {[
           { label: "Dein Name", key: "name", type: "text", placeholder: "Vor- und Nachname" },
           { label: "Dein Verein", key: "verein", type: "text", placeholder: "z.B. FC Musterstadt" },
@@ -298,14 +288,12 @@ function BookingModal({ game, onClose, onConfirm }) {
               style={{ width: "100%", padding: "8px 10px", border: "0.5px solid #ccc", borderRadius: 8, fontSize: 14, outline: "none" }} />
           </div>
         ))}
-
         <div style={{ marginBottom: 10 }}>
           <label style={{ display: "block", fontSize: 12, color: "#666", fontWeight: 500, marginBottom: 5 }}>Jahrgang deiner Mannschaft</label>
           <select value={form.jugend} onChange={(e) => setForm({ ...form, jugend: e.target.value })} style={{ width: "100%", padding: "8px 10px", border: "0.5px solid #ccc", borderRadius: 8, fontSize: 14 }}>
             {["E-Jugend (U10)", "D-Jugend (U12)", "C-Jugend (U14)", "B-Jugend (U17)", "A-Jugend (U19)"].map((j) => <option key={j}>{j}</option>)}
           </select>
         </div>
-
         <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: 12, background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: "pointer", marginTop: 6, opacity: loading ? 0.7 : 1 }}>
           {loading ? "Wird gespeichert..." : "Buchung bestätigen"}
         </button>
@@ -321,14 +309,12 @@ const FILTERS = ["Alle", "Angebote", "Anfragen", "E-Jugend", "D-Jugend", "C-Juge
 
 function ListeTab({ games, userLocation, laden, onSelectGame }) {
   const [activeFilter, setActiveFilter] = useState("Alle");
-
   const filtered = games.filter((g) => {
     if (activeFilter === "Alle") return true;
     if (activeFilter === "Angebote") return g.type === "angebot";
     if (activeFilter === "Anfragen") return g.type === "anfrage";
     return g.jugend.includes(activeFilter);
   });
-
   return (
     <div>
       <div style={{ display: "flex", gap: 6, marginBottom: 14, overflowX: "auto", paddingBottom: 4 }}>
@@ -352,6 +338,7 @@ function ListeTab({ games, userLocation, laden, onSelectGame }) {
 function EintragenTab({ onSubmit }) {
   const [type, setType] = useState("angebot");
   const [staerke, setStaerke] = useState(3);
+  const [umkreis, setUmkreis] = useState(30);
   const [laden, setLaden] = useState(false);
   const [form, setForm] = useState({
     datum: "", uhrzeit: "10:00", jugend: "E-Jugend (U10)", rasen: "Naturrasen",
@@ -366,10 +353,11 @@ function EintragenTab({ onSubmit }) {
       return;
     }
     setLaden(true);
-    await onSubmit({ ...form, type, staerke });
+    await onSubmit({ ...form, type, staerke, umkreis_km: type === "anfrage" ? umkreis : null });
     setForm({ datum: "", uhrzeit: "10:00", jugend: "E-Jugend (U10)", rasen: "Naturrasen", platz: "", adresse: "", trainer_name: "", telefon: "", verein: "" });
     setType("angebot");
     setStaerke(3);
+    setUmkreis(30);
     setLaden(false);
   }
 
@@ -424,16 +412,49 @@ function EintragenTab({ onSubmit }) {
         </div>
       </div>
 
+      {/* Umkreis-Feld — nur bei Anfragen sichtbar */}
+      {type === "anfrage" && (
+        <div style={sectionStyle}>
+          <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Suchradius</div>
+          <label style={labelStyle}>Maximaler Umkreis: {umkreis} km</label>
+          <input
+            type="range" min={5} max={150} step={5} value={umkreis}
+            onChange={(e) => setUmkreis(parseInt(e.target.value))}
+            style={{ width: "100%", marginBottom: 8 }}
+          />
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#aaa" }}>
+            <span>5 km</span>
+            <span style={{ fontWeight: 500, color: "#3C3489" }}>{umkreis} km</span>
+            <span>150 km</span>
+          </div>
+          <div style={{ marginTop: 10, padding: "8px 12px", background: "#EEEDFE", borderRadius: 8, fontSize: 12, color: "#3C3489" }}>
+            Andere Trainer sehen, dass du einen Gegner im Umkreis von {umkreis} km suchst.
+          </div>
+        </div>
+      )}
+
       <div style={sectionStyle}>
-        <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Ort</div>
-        <div style={{ marginBottom: 10 }}>
-          <label style={labelStyle}>Sportplatz Name</label>
-          <input type="text" style={inputStyle} placeholder="z.B. Sportpark Nord" value={form.platz} onChange={(e) => set("platz", e.target.value)} />
+        <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
+          {type === "angebot" ? "Ort" : "Dein Standort"}
         </div>
-        <div>
-          <label style={labelStyle}>Adresse (Straße, PLZ Ort)</label>
-          <input type="text" style={inputStyle} placeholder="Musterstr. 1, 68159 Mannheim" value={form.adresse} onChange={(e) => set("adresse", e.target.value)} />
-        </div>
+        {type === "angebot" ? (
+          <>
+            <div style={{ marginBottom: 10 }}>
+              <label style={labelStyle}>Sportplatz Name</label>
+              <input type="text" style={inputStyle} placeholder="z.B. Sportpark Nord" value={form.platz} onChange={(e) => set("platz", e.target.value)} />
+            </div>
+            <div>
+              <label style={labelStyle}>Adresse (Straße, PLZ Ort)</label>
+              <input type="text" style={inputStyle} placeholder="Musterstr. 1, 68159 Mannheim" value={form.adresse} onChange={(e) => set("adresse", e.target.value)} />
+            </div>
+          </>
+        ) : (
+          <div>
+            <label style={labelStyle}>Deine Stadt / PLZ</label>
+            <input type="text" style={inputStyle} placeholder="z.B. Mannheim oder 68159" value={form.adresse} onChange={(e) => set("adresse", e.target.value)} />
+            <div style={{ fontSize: 12, color: "#888", marginTop: 6 }}>Damit andere Trainer wissen wo du ungefähr bist.</div>
+          </div>
+        )}
       </div>
 
       <div style={sectionStyle}>
@@ -534,7 +555,7 @@ function SucheTab({ games, userLocation, onSelectGame }) {
         </div>
         <div style={{ marginBottom: 14 }}>
           <label style={labelStyle}>Umkreis: {km} km{userLocation ? ` (ab ${userLocation.label})` : " (kein Standort gesetzt)"}</label>
-          <input type="range" min={5} max={100} step={5} value={km} onChange={(e) => setKm(parseInt(e.target.value))} style={{ width: "100%" }} />
+          <input type="range" min={5} max={150} step={5} value={km} onChange={(e) => setKm(parseInt(e.target.value))} style={{ width: "100%" }} />
         </div>
         <button onClick={search} style={{ width: "100%", padding: 12, background: "#185FA5", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: "pointer" }}>Suchen</button>
       </div>
@@ -581,18 +602,12 @@ export default function App() {
   const [userLocation, setUserLocation] = useState(null);
   const [showStandortModal, setShowStandortModal] = useState(false);
 
-  // ── Login-Logik ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => { setSession(session); }
-    );
+    supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => { setSession(session); });
     return () => subscription.unsubscribe();
   }, []);
 
-  // ── Spiele aus Supabase laden ─────────────────────────────────────────────────
   useEffect(() => {
     if (!session) return;
     ladeSpiele();
@@ -600,25 +615,18 @@ export default function App() {
 
   async function ladeSpiele() {
     setLaden(true);
-    const { data, error } = await supabase
-      .from("games")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (!error && data) {
-      setGames(data);
-    }
+    const { data, error } = await supabase.from("games").select("*").order("created_at", { ascending: false });
+    if (!error && data) setGames(data);
     setLaden(false);
   }
 
   if (!session) return <Login />;
 
-  // ── App-Logik ────────────────────────────────────────────────────────────────
   function showToast(msg) {
     setToast(msg);
     setTimeout(() => setToast(""), 2500);
   }
 
-  // Neues Spiel in Supabase speichern
   async function handleAddGame(formData) {
     const { data, error } = await supabase
       .from("games")
@@ -635,36 +643,21 @@ export default function App() {
         telefon: formData.telefon,
         verein: formData.verein,
         status: "offen",
+        umkreis_km: formData.umkreis_km || null,
         lat: null,
         lng: null,
       }])
       .select();
-
-    if (error) {
-      alert("Fehler beim Speichern: " + error.message);
-      return;
-    }
-    if (data) {
-      setGames((prev) => [data[0], ...prev]);
-    }
+    if (error) { alert("Fehler beim Speichern: " + error.message); return; }
+    if (data) setGames((prev) => [data[0], ...prev]);
     showToast("✓ Erfolgreich veröffentlicht!");
     setActiveTab("liste");
   }
 
-  // Buchung in Supabase speichern
   async function handleConfirmBooking(bookingData) {
-    const { error } = await supabase
-      .from("games")
-      .update({ status: "gebucht" })
-      .eq("id", bookingGame.id);
-
-    if (error) {
-      alert("Fehler beim Buchen: " + error.message);
-      return;
-    }
-    setGames((prev) =>
-      prev.map((g) => g.id === bookingGame.id ? { ...g, status: "gebucht" } : g)
-    );
+    const { error } = await supabase.from("games").update({ status: "gebucht" }).eq("id", bookingGame.id);
+    if (error) { alert("Fehler beim Buchen: " + error.message); return; }
+    setGames((prev) => prev.map((g) => g.id === bookingGame.id ? { ...g, status: "gebucht" } : g));
     setBookingGame(null);
     showToast("✓ Spiel gebucht!");
     setActiveTab("meine");
@@ -681,7 +674,6 @@ export default function App() {
   return (
     <div style={{ maxWidth: 680, margin: "0 auto", padding: "1rem", fontFamily: "system-ui, sans-serif", color: "#1a1a1a" }}>
 
-      {/* Header */}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: "1rem" }}>
         <div style={{ width: 32, height: 32, background: "#1D9E75", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>⚽</div>
         <div>
@@ -702,7 +694,6 @@ export default function App() {
 
       <Toast message={toast} />
 
-      {/* Tab-Bar */}
       <div style={{ display: "flex", gap: 4, marginBottom: "1.25rem", background: "#f5f5f5", borderRadius: 12, padding: 4 }}>
         {TABS.map((tab) => (
           <button key={tab.id} onClick={() => setActiveTab(tab.id)}
@@ -718,25 +709,13 @@ export default function App() {
       {activeTab === "meine" && <MeineTab games={games} userLocation={userLocation} onSelectGame={setSelectedGame} />}
 
       {selectedGame && currentGame && (
-        <DetailModal
-          game={currentGame}
-          userLocation={userLocation}
-          onClose={() => setSelectedGame(null)}
-          onBook={(g) => { setSelectedGame(null); setBookingGame(g); }}
-        />
+        <DetailModal game={currentGame} userLocation={userLocation} onClose={() => setSelectedGame(null)} onBook={(g) => { setSelectedGame(null); setBookingGame(g); }} />
       )}
       {bookingGame && (
-        <BookingModal
-          game={bookingGame}
-          onClose={() => setBookingGame(null)}
-          onConfirm={handleConfirmBooking}
-        />
+        <BookingModal game={bookingGame} onClose={() => setBookingGame(null)} onConfirm={handleConfirmBooking} />
       )}
       {showStandortModal && (
-        <StandortModal
-          onClose={() => setShowStandortModal(false)}
-          onSave={handleSaveStandort}
-        />
+        <StandortModal onClose={() => setShowStandortModal(false)} onSave={handleSaveStandort} />
       )}
     </div>
   );
