@@ -22,8 +22,177 @@ function haversine(lat1, lon1, lat2, lon2) {
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
 }
 
-const STUTTGART_LAT = 48.7758;
-const STUTTGART_LNG = 9.1829;
+// ─── Standort-Modal ────────────────────────────────────────────────────────────
+
+function StandortModal({ onClose, onSave }) {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [stadtInput, setStadtInput] = useState("");
+
+  async function useGPS() {
+    setLoading(true);
+    setError("");
+    if (!navigator.geolocation) {
+      setError("GPS wird von deinem Gerät nicht unterstützt.");
+      setLoading(false);
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const { latitude, longitude } = pos.coords;
+        // Reverse Geocoding über OpenStreetMap (kostenlos, kein API-Key nötig)
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?lat=${latitude}&lon=${longitude}&format=json`
+          );
+          const data = await res.json();
+          const stadt =
+            data.address.city ||
+            data.address.town ||
+            data.address.village ||
+            data.address.county ||
+            "Unbekannt";
+          onSave({ lat: latitude, lng: longitude, label: stadt });
+        } catch {
+          onSave({ lat: latitude, lng: longitude, label: "GPS-Standort" });
+        }
+        setLoading(false);
+      },
+      () => {
+        setError("GPS-Zugriff verweigert. Bitte manuell eingeben.");
+        setLoading(false);
+      }
+    );
+  }
+
+  async function useStadt() {
+    if (!stadtInput.trim()) {
+      setError("Bitte eine Stadt oder PLZ eingeben.");
+      return;
+    }
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(stadtInput)}&format=json&limit=1&countrycodes=de`
+      );
+      const data = await res.json();
+      if (!data.length) {
+        setError("Ort nicht gefunden. Bitte anders eingeben.");
+        setLoading(false);
+        return;
+      }
+      onSave({
+        lat: parseFloat(data[0].lat),
+        lng: parseFloat(data[0].lon),
+        label: stadtInput.trim(),
+      });
+    } catch {
+      setError("Fehler bei der Suche. Bitte erneut versuchen.");
+    }
+    setLoading(false);
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        zIndex: 200, padding: 16,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "white", borderRadius: 16,
+          padding: "1.5rem", maxWidth: 360, width: "100%",
+          position: "relative",
+        }}
+      >
+        <button
+          onClick={onClose}
+          style={{
+            position: "absolute", top: 12, right: 12,
+            width: 28, height: 28, borderRadius: "50%",
+            border: "0.5px solid #e5e5e5", background: "#f5f5f5",
+            cursor: "pointer", fontSize: 13, color: "#666",
+          }}
+        >✕</button>
+
+        <div style={{ fontSize: 16, fontWeight: 500, marginBottom: 6 }}>Mein Standort</div>
+        <div style={{ fontSize: 13, color: "#888", marginBottom: 20 }}>
+          Wird für die Umkreissuche und Entfernungsanzeige verwendet.
+        </div>
+
+        {/* GPS Button */}
+        <button
+          onClick={useGPS}
+          disabled={loading}
+          style={{
+            width: "100%", padding: 12,
+            background: "#1D9E75", color: "white",
+            border: "none", borderRadius: 8,
+            fontSize: 14, fontWeight: 500, cursor: "pointer",
+            marginBottom: 12, opacity: loading ? 0.7 : 1,
+          }}
+        >
+          {loading ? "Wird ermittelt..." : "📍 GPS-Standort verwenden"}
+        </button>
+
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+          <div style={{ flex: 1, height: "0.5px", background: "#e5e5e5" }} />
+          <span style={{ fontSize: 12, color: "#aaa" }}>oder</span>
+          <div style={{ flex: 1, height: "0.5px", background: "#e5e5e5" }} />
+        </div>
+
+        {/* Manuelle Eingabe */}
+        <div style={{ marginBottom: 10 }}>
+          <label style={{ display: "block", fontSize: 12, color: "#666", fontWeight: 500, marginBottom: 5 }}>
+            Stadt oder PLZ eingeben
+          </label>
+          <input
+            type="text"
+            placeholder="z.B. Mannheim oder 68159"
+            value={stadtInput}
+            onChange={(e) => setStadtInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && useStadt()}
+            style={{
+              width: "100%", padding: "9px 10px",
+              border: "0.5px solid #ccc", borderRadius: 8,
+              fontSize: 14, outline: "none",
+            }}
+          />
+        </div>
+
+        <button
+          onClick={useStadt}
+          disabled={loading}
+          style={{
+            width: "100%", padding: 11,
+            background: "#185FA5", color: "white",
+            border: "none", borderRadius: 8,
+            fontSize: 14, fontWeight: 500, cursor: "pointer",
+            opacity: loading ? 0.7 : 1,
+          }}
+        >
+          Standort bestätigen
+        </button>
+
+        {error && (
+          <div style={{
+            marginTop: 12, padding: "8px 12px",
+            background: "#FCEBEB", borderRadius: 8,
+            fontSize: 13, color: "#791F1F",
+          }}>
+            {error}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ─── Kleine Hilfskomponenten ───────────────────────────────────────────────────
 
@@ -77,10 +246,11 @@ function Toast({ message }) {
 
 // ─── Spielkarte ────────────────────────────────────────────────────────────────
 
-function GameCard({ game, onClick }) {
-  const dist = game.lat && game.lng
-    ? haversine(STUTTGART_LAT, STUTTGART_LNG, game.lat, game.lng)
+function GameCard({ game, userLocation, onClick }) {
+  const dist = userLocation && game.lat && game.lng
+    ? haversine(userLocation.lat, userLocation.lng, game.lat, game.lng)
     : null;
+
   return (
     <div
       onClick={() => onClick(game)}
@@ -122,10 +292,10 @@ function GameCard({ game, onClick }) {
 
 // ─── Detailansicht (Modal) ─────────────────────────────────────────────────────
 
-function DetailModal({ game, bookings, onClose, onBook }) {
+function DetailModal({ game, bookings, userLocation, onClose, onBook }) {
   if (!game) return null;
-  const dist = game.lat && game.lng
-    ? haversine(STUTTGART_LAT, STUTTGART_LNG, game.lat, game.lng)
+  const dist = userLocation && game.lat && game.lng
+    ? haversine(userLocation.lat, userLocation.lng, game.lat, game.lng)
     : null;
   const booking = bookings.find((b) => b.gameId === game.id);
   const mapsUrl = game.adresse
@@ -354,7 +524,7 @@ function BookingModal({ game, onClose, onConfirm }) {
 
 const FILTERS = ["Alle", "Angebote", "Anfragen", "E-Jugend", "D-Jugend", "C-Jugend"];
 
-function ListeTab({ games, bookings, onSelectGame }) {
+function ListeTab({ games, bookings, userLocation, onSelectGame }) {
   const [activeFilter, setActiveFilter] = useState("Alle");
 
   const filtered = games.filter((g) => {
@@ -388,7 +558,9 @@ function ListeTab({ games, bookings, onSelectGame }) {
           Noch keine Einträge vorhanden.
         </div>
       ) : (
-        filtered.map((g) => <GameCard key={g.id} game={g} onClick={onSelectGame} />)
+        filtered.map((g) => (
+          <GameCard key={g.id} game={g} userLocation={userLocation} onClick={onSelectGame} />
+        ))
       )}
     </div>
   );
@@ -417,15 +589,9 @@ function EintragenTab({ onSubmit }) {
     setStaerke(3);
   }
 
-  const inputStyle = {
-    width: "100%", padding: "8px 10px",
-    border: "0.5px solid #ccc", borderRadius: 8, fontSize: 14,
-  };
+  const inputStyle = { width: "100%", padding: "8px 10px", border: "0.5px solid #ccc", borderRadius: 8, fontSize: 14 };
   const labelStyle = { display: "block", fontSize: 12, color: "#666", fontWeight: 500, marginBottom: 5 };
-  const sectionStyle = {
-    background: "white", border: "0.5px solid #e5e5e5",
-    borderRadius: 12, padding: "1.25rem", marginBottom: 10,
-  };
+  const sectionStyle = { background: "white", border: "0.5px solid #e5e5e5", borderRadius: 12, padding: "1.25rem", marginBottom: 10 };
 
   return (
     <div>
@@ -434,32 +600,22 @@ function EintragenTab({ onSubmit }) {
           { val: "angebot", label: "⚽ Spiel anbieten", active: "#E1F5EE", activeTxt: "#085041", activeBorder: "#1D9E75" },
           { val: "anfrage", label: "🔍 Spiel anfragen", active: "#EEEDFE", activeTxt: "#3C3489", activeBorder: "#534AB7" },
         ].map((btn) => (
-          <button
-            key={btn.val}
-            onClick={() => setType(btn.val)}
+          <button key={btn.val} onClick={() => setType(btn.val)}
             style={{
               flex: 1, padding: 10, borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer",
               border: `0.5px solid ${type === btn.val ? btn.activeBorder : "#ccc"}`,
               background: type === btn.val ? btn.active : "transparent",
               color: type === btn.val ? btn.activeTxt : "#888",
             }}
-          >
-            {btn.label}
-          </button>
+          >{btn.label}</button>
         ))}
       </div>
 
       <div style={sectionStyle}>
         <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Spieldaten</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-          <div>
-            <label style={labelStyle}>Datum</label>
-            <input type="date" style={inputStyle} value={form.datum} onChange={(e) => set("datum", e.target.value)} />
-          </div>
-          <div>
-            <label style={labelStyle}>Uhrzeit</label>
-            <input type="time" style={inputStyle} value={form.uhrzeit} onChange={(e) => set("uhrzeit", e.target.value)} />
-          </div>
+          <div><label style={labelStyle}>Datum</label><input type="date" style={inputStyle} value={form.datum} onChange={(e) => set("datum", e.target.value)} /></div>
+          <div><label style={labelStyle}>Uhrzeit</label><input type="time" style={inputStyle} value={form.uhrzeit} onChange={(e) => set("uhrzeit", e.target.value)} /></div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
           <div>
@@ -479,9 +635,7 @@ function EintragenTab({ onSubmit }) {
           <label style={labelStyle}>Spielstärke (1 = schwächer, 5 = stärker)</label>
           <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
             {[1, 2, 3, 4, 5].map((n) => (
-              <button
-                key={n}
-                onClick={() => setStaerke(n)}
+              <button key={n} onClick={() => setStaerke(n)}
                 style={{
                   width: 36, height: 36, borderRadius: "50%", border: "0.5px solid",
                   borderColor: staerke === n ? "#1D9E75" : "#ccc",
@@ -489,9 +643,7 @@ function EintragenTab({ onSubmit }) {
                   color: staerke === n ? "white" : "#888",
                   fontSize: 13, fontWeight: 500, cursor: "pointer",
                 }}
-              >
-                {n}
-              </button>
+              >{n}</button>
             ))}
           </div>
         </div>
@@ -505,45 +657,32 @@ function EintragenTab({ onSubmit }) {
         </div>
         <div>
           <label style={labelStyle}>Adresse (Straße, PLZ Ort)</label>
-          <input type="text" style={inputStyle} placeholder="Musterstr. 1, 70563 Stuttgart" value={form.adresse} onChange={(e) => set("adresse", e.target.value)} />
+          <input type="text" style={inputStyle} placeholder="Musterstr. 1, 68159 Mannheim" value={form.adresse} onChange={(e) => set("adresse", e.target.value)} />
         </div>
       </div>
 
       <div style={sectionStyle}>
         <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Trainer & Verein</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-          <div>
-            <label style={labelStyle}>Name</label>
-            <input type="text" style={inputStyle} placeholder="Vor- Nachname" value={form.trainer_name} onChange={(e) => set("trainer_name", e.target.value)} />
-          </div>
-          <div>
-            <label style={labelStyle}>Telefon</label>
-            <input type="tel" style={inputStyle} placeholder="+49 ..." value={form.telefon} onChange={(e) => set("telefon", e.target.value)} />
-          </div>
+          <div><label style={labelStyle}>Name</label><input type="text" style={inputStyle} placeholder="Vor- Nachname" value={form.trainer_name} onChange={(e) => set("trainer_name", e.target.value)} /></div>
+          <div><label style={labelStyle}>Telefon</label><input type="tel" style={inputStyle} placeholder="+49 ..." value={form.telefon} onChange={(e) => set("telefon", e.target.value)} /></div>
         </div>
         <div>
           <label style={labelStyle}>Verein</label>
-          <input type="text" style={inputStyle} placeholder="z.B. FC Musterstadt" value={form.verein} onChange={(e) => set("verein", e.target.value)} />
+          <input type="text" style={inputStyle} placeholder="z.B. FC Mannheim" value={form.verein} onChange={(e) => set("verein", e.target.value)} />
         </div>
       </div>
 
-      <button
-        onClick={handleSubmit}
-        style={{
-          width: "100%", padding: 12, background: "#1D9E75",
-          color: "white", border: "none", borderRadius: 8,
-          fontSize: 15, fontWeight: 500, cursor: "pointer",
-        }}
-      >
-        Veröffentlichen
-      </button>
+      <button onClick={handleSubmit}
+        style={{ width: "100%", padding: 12, background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: "pointer" }}
+      >Veröffentlichen</button>
     </div>
   );
 }
 
 // ─── Tab: Suche ────────────────────────────────────────────────────────────────
 
-function SucheTab({ games, onSelectGame }) {
+function SucheTab({ games, userLocation, onSelectGame }) {
   const [results, setResults] = useState(null);
   const [km, setKm] = useState(30);
   const [filter, setFilter] = useState({ jugend: "", typ: "", datum: "", staerke: "", rasen: "" });
@@ -551,6 +690,7 @@ function SucheTab({ games, onSelectGame }) {
   function set(key, val) { setFilter((f) => ({ ...f, [key]: val })); }
 
   function search() {
+    const loc = userLocation;
     const res = games
       .filter((g) => {
         if (filter.jugend && !g.jugend.includes(filter.jugend.split(" ")[0])) return false;
@@ -558,28 +698,30 @@ function SucheTab({ games, onSelectGame }) {
         if (filter.datum && g.datum < filter.datum) return false;
         if (filter.staerke && g.staerke !== parseInt(filter.staerke)) return false;
         if (filter.rasen && g.rasen !== filter.rasen) return false;
-        if (g.lat && g.lng && haversine(STUTTGART_LAT, STUTTGART_LNG, g.lat, g.lng) > km) return false;
+        if (loc && g.lat && g.lng && haversine(loc.lat, loc.lng, g.lat, g.lng) > km) return false;
         return true;
       })
       .sort((a, b) => {
-        const da = a.lat && a.lng ? haversine(STUTTGART_LAT, STUTTGART_LNG, a.lat, a.lng) : 999;
-        const db = b.lat && b.lng ? haversine(STUTTGART_LAT, STUTTGART_LNG, b.lat, b.lng) : 999;
+        if (!loc) return 0;
+        const da = a.lat && a.lng ? haversine(loc.lat, loc.lng, a.lat, a.lng) : 999;
+        const db = b.lat && b.lng ? haversine(loc.lat, loc.lng, b.lat, b.lng) : 999;
         return da - db;
       });
     setResults(res);
   }
 
-  const selectStyle = {
-    width: "100%", padding: "8px 10px",
-    border: "0.5px solid #ccc", borderRadius: 8, fontSize: 14,
-  };
+  const selectStyle = { width: "100%", padding: "8px 10px", border: "0.5px solid #ccc", borderRadius: 8, fontSize: 14 };
   const labelStyle = { display: "block", fontSize: 12, color: "#666", fontWeight: 500, marginBottom: 5 };
 
   return (
     <div>
+      {!userLocation && (
+        <div style={{ background: "#FAEEDA", borderRadius: 10, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#633806" }}>
+          ⚠️ Kein Standort gesetzt — bitte oben rechts deinen Standort eingeben für die Umkreissuche.
+        </div>
+      )}
       <div style={{ background: "white", border: "0.5px solid #e5e5e5", borderRadius: 12, padding: "1.25rem", marginBottom: 10 }}>
         <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Spiel finden</div>
-
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
           <div>
             <label style={labelStyle}>Jahrgang</label>
@@ -597,12 +739,8 @@ function SucheTab({ games, onSelectGame }) {
             </select>
           </div>
         </div>
-
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-          <div>
-            <label style={labelStyle}>Datum ab</label>
-            <input type="date" style={selectStyle} value={filter.datum} onChange={(e) => set("datum", e.target.value)} />
-          </div>
+          <div><label style={labelStyle}>Datum ab</label><input type="date" style={selectStyle} value={filter.datum} onChange={(e) => set("datum", e.target.value)} /></div>
           <div>
             <label style={labelStyle}>Spielstärke</label>
             <select style={selectStyle} value={filter.staerke} onChange={(e) => set("staerke", e.target.value)}>
@@ -611,7 +749,6 @@ function SucheTab({ games, onSelectGame }) {
             </select>
           </div>
         </div>
-
         <div style={{ marginBottom: 10 }}>
           <label style={labelStyle}>Rasen</label>
           <select style={selectStyle} value={filter.rasen} onChange={(e) => set("rasen", e.target.value)}>
@@ -619,32 +756,23 @@ function SucheTab({ games, onSelectGame }) {
             {["Naturrasen", "Kunstrasen", "Hartplatz", "Halle"].map((r) => <option key={r}>{r}</option>)}
           </select>
         </div>
-
         <div style={{ marginBottom: 14 }}>
-          <label style={labelStyle}>Umkreis: {km} km (Standort: Stuttgart)</label>
-          <input
-            type="range" min={5} max={100} step={5} value={km}
+          <label style={labelStyle}>
+            Umkreis: {km} km
+            {userLocation ? ` (ab ${userLocation.label})` : " (kein Standort gesetzt)"}
+          </label>
+          <input type="range" min={5} max={100} step={5} value={km}
             onChange={(e) => setKm(parseInt(e.target.value))}
-            style={{ width: "100%" }}
-          />
+            style={{ width: "100%" }} />
         </div>
-
-        <button
-          onClick={search}
-          style={{
-            width: "100%", padding: 12, background: "#185FA5",
-            color: "white", border: "none", borderRadius: 8,
-            fontSize: 15, fontWeight: 500, cursor: "pointer",
-          }}
-        >
-          Suchen
-        </button>
+        <button onClick={search}
+          style={{ width: "100%", padding: 12, background: "#185FA5", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: "pointer" }}
+        >Suchen</button>
       </div>
-
       {results !== null && (
         results.length === 0
           ? <div style={{ textAlign: "center", padding: "2rem", color: "#aaa" }}>Keine Spiele gefunden</div>
-          : results.map((g) => <GameCard key={g.id} game={g} onClick={onSelectGame} />)
+          : results.map((g) => <GameCard key={g.id} game={g} userLocation={userLocation} onClick={onSelectGame} />)
       )}
     </div>
   );
@@ -652,9 +780,8 @@ function SucheTab({ games, onSelectGame }) {
 
 // ─── Tab: Meine Spiele ─────────────────────────────────────────────────────────
 
-function MeineTab({ games, bookings, onSelectGame }) {
+function MeineTab({ games, bookings, userLocation, onSelectGame }) {
   const myGames = bookings.map((b) => games.find((g) => g.id === b.gameId)).filter(Boolean);
-
   if (myGames.length === 0) {
     return (
       <div style={{ textAlign: "center", padding: "3rem 1rem", color: "#aaa" }}>
@@ -664,7 +791,7 @@ function MeineTab({ games, bookings, onSelectGame }) {
   }
   return (
     <div>
-      {myGames.map((g) => <GameCard key={g.id} game={g} onClick={onSelectGame} />)}
+      {myGames.map((g) => <GameCard key={g.id} game={g} userLocation={userLocation} onClick={onSelectGame} />)}
     </div>
   );
 }
@@ -686,26 +813,21 @@ export default function App() {
   const [selectedGame, setSelectedGame] = useState(null);
   const [bookingGame, setBookingGame] = useState(null);
   const [toast, setToast] = useState("");
+  const [userLocation, setUserLocation] = useState(null);
+  const [showStandortModal, setShowStandortModal] = useState(false);
 
   // ── Login-Logik ──────────────────────────────────────────────────────────────
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
     });
-
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-      }
+      (_event, session) => { setSession(session); }
     );
-
     return () => subscription.unsubscribe();
   }, []);
 
-  // Kein Nutzer eingeloggt → Login-Seite anzeigen
-  if (!session) {
-    return <Login />;
-  }
+  if (!session) return <Login />;
 
   // ── App-Logik ────────────────────────────────────────────────────────────────
   function showToast(msg) {
@@ -736,6 +858,12 @@ export default function App() {
     setActiveTab("meine");
   }
 
+  function handleSaveStandort(loc) {
+    setUserLocation(loc);
+    setShowStandortModal(false);
+    showToast(`✓ Standort gesetzt: ${loc.label}`);
+  }
+
   return (
     <div style={{ maxWidth: 680, margin: "0 auto", padding: "1rem", fontFamily: "system-ui, sans-serif", color: "#1a1a1a" }}>
 
@@ -747,8 +875,19 @@ export default function App() {
           <div style={{ fontSize: 12, color: "#888" }}>Freundschaftsspiele koordinieren</div>
         </div>
 
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
-          <span style={{ fontSize: 12, color: "#aaa" }}>{session.user.email}</span>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}>
+          {/* Standort-Button */}
+          <button
+            onClick={() => setShowStandortModal(true)}
+            style={{
+              padding: "5px 10px", fontSize: 12, cursor: "pointer",
+              border: "0.5px solid #e5e5e5", borderRadius: 8,
+              background: userLocation ? "#E1F5EE" : "white",
+              color: userLocation ? "#085041" : "#666",
+            }}
+          >
+            📍 {userLocation ? userLocation.label : "Standort"}
+          </button>
           <button
             onClick={() => supabase.auth.signOut()}
             style={{
@@ -767,9 +906,7 @@ export default function App() {
       {/* Tab-Bar */}
       <div style={{ display: "flex", gap: 4, marginBottom: "1.25rem", background: "#f5f5f5", borderRadius: 12, padding: 4 }}>
         {TABS.map((tab) => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
             style={{
               flex: 1, padding: "8px 10px", border: "none", borderRadius: 8,
               cursor: "pointer", fontSize: 13, fontWeight: 500, transition: "all .15s",
@@ -777,29 +914,20 @@ export default function App() {
               color: activeTab === tab.id ? "#1a1a1a" : "#888",
               boxShadow: activeTab === tab.id ? "0 0 0 0.5px #e0e0e0" : "none",
             }}
-          >
-            {tab.label}
-          </button>
+          >{tab.label}</button>
         ))}
       </div>
 
-      {activeTab === "liste" && (
-        <ListeTab games={games} bookings={bookings} onSelectGame={setSelectedGame} />
-      )}
-      {activeTab === "neu" && (
-        <EintragenTab onSubmit={handleAddGame} />
-      )}
-      {activeTab === "suche" && (
-        <SucheTab games={games} onSelectGame={setSelectedGame} />
-      )}
-      {activeTab === "meine" && (
-        <MeineTab games={games} bookings={bookings} onSelectGame={setSelectedGame} />
-      )}
+      {activeTab === "liste" && <ListeTab games={games} bookings={bookings} userLocation={userLocation} onSelectGame={setSelectedGame} />}
+      {activeTab === "neu" && <EintragenTab onSubmit={handleAddGame} />}
+      {activeTab === "suche" && <SucheTab games={games} userLocation={userLocation} onSelectGame={setSelectedGame} />}
+      {activeTab === "meine" && <MeineTab games={games} bookings={bookings} userLocation={userLocation} onSelectGame={setSelectedGame} />}
 
       {selectedGame && (
         <DetailModal
           game={games.find((g) => g.id === selectedGame.id)}
           bookings={bookings}
+          userLocation={userLocation}
           onClose={() => setSelectedGame(null)}
           onBook={(g) => { setSelectedGame(null); setBookingGame(g); }}
         />
@@ -809,6 +937,12 @@ export default function App() {
           game={bookingGame}
           onClose={() => setBookingGame(null)}
           onConfirm={handleConfirmBooking}
+        />
+      )}
+      {showStandortModal && (
+        <StandortModal
+          onClose={() => setShowStandortModal(false)}
+          onSave={handleSaveStandort}
         />
       )}
     </div>
