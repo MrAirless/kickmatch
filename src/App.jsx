@@ -82,7 +82,7 @@ function Badge({ children, variant = "gray" }) {
   const v = {
     offer:  { bg: "#E1F5EE", text: "#085041", border: "#A8DFC4" },
     search: { bg: "#EEEDFE", text: "#3C3489", border: "#C5C2F8" },
-    green:  { bg: "#EAF3DE", text: "#27500A", border: "#B8DCA0" },
+    green:  { bg: "#FCEBEB", text: "#791F1F", border: "#F09595" },
     gray:   { bg: "#F1EFE8", text: "#444441", border: "#D8D6CE" },
     orange: { bg: "#FAEEDA", text: "#633806", border: "#F0C98A" },
     blue:   { bg: "#E6F1FB", text: "#0C447C", border: "#B5D4F4" },
