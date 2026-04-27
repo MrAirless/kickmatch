@@ -11,7 +11,7 @@ const MANNSCHAFTEN = {
   "Damen": ["Damen 1. Mannschaft", "Damen 2. Mannschaft", "Damen Ü32"],
 };
 
-const ALLE_MANNSCHAFTEN = Object.values(MANNSCHAFTEN).flat();
+const SPIELFELD_GROESSEN = ["Vollfeld (11 vs 11)", "Großfeld (9 vs 9)", "Mittelfeld (7 vs 7)", "Kleinfeld (5 vs 5)", "Futsal"];
 
 // ─── Hilfsfunktionen ───────────────────────────────────────────────────────────
 
@@ -58,13 +58,8 @@ function StandortModal({ onClose, onSave }) {
   const [stadtInput, setStadtInput] = useState("");
 
   async function useGPS() {
-    setLoading(true);
-    setError("");
-    if (!navigator.geolocation) {
-      setError("GPS wird von deinem Gerät nicht unterstützt.");
-      setLoading(false);
-      return;
-    }
+    setLoading(true); setError("");
+    if (!navigator.geolocation) { setError("GPS wird von deinem Gerät nicht unterstützt."); setLoading(false); return; }
     navigator.geolocation.getCurrentPosition(
       async (pos) => {
         const { latitude, longitude } = pos.coords;
@@ -73,9 +68,7 @@ function StandortModal({ onClose, onSave }) {
           const data = await res.json();
           const stadt = data.address.city || data.address.town || data.address.village || data.address.county || "Unbekannt";
           onSave({ lat: latitude, lng: longitude, label: stadt });
-        } catch {
-          onSave({ lat: latitude, lng: longitude, label: "GPS-Standort" });
-        }
+        } catch { onSave({ lat: latitude, lng: longitude, label: "GPS-Standort" }); }
         setLoading(false);
       },
       () => { setError("GPS-Zugriff verweigert. Bitte manuell eingeben."); setLoading(false); }
@@ -84,16 +77,13 @@ function StandortModal({ onClose, onSave }) {
 
   async function useStadt() {
     if (!stadtInput.trim()) { setError("Bitte eine Stadt oder PLZ eingeben."); return; }
-    setLoading(true);
-    setError("");
+    setLoading(true); setError("");
     try {
       const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(stadtInput)}&format=json&limit=1&countrycodes=de`);
       const data = await res.json();
-      if (!data.length) { setError("Ort nicht gefunden. Bitte anders eingeben."); setLoading(false); return; }
+      if (!data.length) { setError("Ort nicht gefunden."); setLoading(false); return; }
       onSave({ lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon), label: stadtInput.trim() });
-    } catch {
-      setError("Fehler bei der Suche. Bitte erneut versuchen.");
-    }
+    } catch { setError("Fehler bei der Suche."); }
     setLoading(false);
   }
 
@@ -128,27 +118,21 @@ function StandortModal({ onClose, onSave }) {
 // ─── Mannschafts-Auswahl Komponente ───────────────────────────────────────────
 
 function MannschaftAuswahl({ value, onChange }) {
-  const [aktiveKat, setAktiveKat] = useState(() => {
-    if (!value) return "Junioren";
-    return getKategorie(value) || "Junioren";
-  });
-
+  const [aktiveKat, setAktiveKat] = useState(() => getKategorie(value) || "Junioren");
   return (
     <div>
-      {/* Kategorie-Tabs */}
       <div style={{ display: "flex", gap: 4, marginBottom: 10, background: "#f5f5f5", borderRadius: 10, padding: 4 }}>
         {Object.keys(MANNSCHAFTEN).map((kat) => {
           const c = kategorieColor(kat);
           const aktiv = aktiveKat === kat;
           return (
             <button key={kat} onClick={() => { setAktiveKat(kat); onChange(MANNSCHAFTEN[kat][0]); }}
-              style={{ flex: 1, padding: "7px 4px", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 500, transition: "all .15s", background: aktiv ? c.background : "transparent", color: aktiv ? c.color : "#888" }}>
+              style={{ flex: 1, padding: "7px 4px", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 500, background: aktiv ? c.background : "transparent", color: aktiv ? c.color : "#888" }}>
               {kat}
             </button>
           );
         })}
       </div>
-      {/* Mannschafts-Liste */}
       <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
         {MANNSCHAFTEN[aktiveKat].map((m) => {
           const aktiv = value === m;
@@ -177,7 +161,7 @@ function StrengthDots({ value }) {
   );
 }
 
-function Badge({ children, color, style: extraStyle }) {
+function Badge({ children, color }) {
   const styles = {
     offer:  { background: "#E1F5EE", color: "#085041" },
     search: { background: "#EEEDFE", color: "#3C3489" },
@@ -187,7 +171,7 @@ function Badge({ children, color, style: extraStyle }) {
     orange: { background: "#FAEEDA", color: "#633806" },
   };
   const s = styles[color] || styles.gray;
-  return <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, ...s, ...extraStyle }}>{children}</span>;
+  return <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, ...s }}>{children}</span>;
 }
 
 function Toast({ message }) {
@@ -229,11 +213,19 @@ function GameCard({ game, userLocation, onClick }) {
         <span style={{ fontSize: 12, color: "#888" }}>🕐 {game.uhrzeit}</span>
         {game.platz && <span style={{ fontSize: 12, color: "#888" }}>· {game.platz}</span>}
         <span style={{ fontSize: 12, color: "#888" }}>· {game.rasen}</span>
+        {game.spielfeld_groesse && <span style={{ fontSize: 12, color: "#888" }}>· {game.spielfeld_groesse}</span>}
+        {game.spieldauer && <span style={{ fontSize: 12, color: "#888" }}>· {game.spieldauer} min</span>}
       </div>
       <div style={{ marginTop: 8, display: "flex", alignItems: "center", gap: 8 }}>
         <span style={{ fontSize: 11, color: "#888" }}>Spielstärke:</span>
         <StrengthDots value={game.staerke} />
       </div>
+      {/* Wichtige Infos als Hinweis-Box auf der Karte */}
+      {game.wichtige_infos && (
+        <div style={{ marginTop: 8, padding: "6px 10px", background: "#FAEEDA", borderRadius: 6, fontSize: 12, color: "#633806" }}>
+          ℹ️ {game.wichtige_infos}
+        </div>
+      )}
     </div>
   );
 }
@@ -271,6 +263,8 @@ function DetailModal({ game, userLocation, onClose, onBook }) {
           { icon: "📅", label: "Datum & Uhrzeit", value: `${formatDate(game.datum)} um ${game.uhrzeit} Uhr` },
           { icon: "📍", label: "Sportplatz", value: game.platz ? `${game.platz} — ${game.adresse}` : "Noch offen" },
           { icon: "🌿", label: "Rasenart", value: game.rasen },
+          ...(game.spielfeld_groesse ? [{ icon: "⬛", label: "Spielfeldgröße", value: game.spielfeld_groesse }] : []),
+          ...(game.spieldauer ? [{ icon: "⏱️", label: "Spieldauer", value: `${game.spieldauer} Minuten` }] : []),
           { icon: "👤", label: "Trainer", value: game.trainer_name },
           { icon: "📞", label: "Telefon", value: game.telefon },
         ].map((row) => (
@@ -304,6 +298,14 @@ function DetailModal({ game, userLocation, onClose, onBook }) {
           </div>
         )}
 
+        {/* Wichtige Infos */}
+        {game.wichtige_infos && (
+          <div style={{ margin: "12px 0", padding: "12px 14px", background: "#FAEEDA", borderRadius: 10, borderLeft: "3px solid #BA7517" }}>
+            <div style={{ fontSize: 11, color: "#633806", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>ℹ️ Wichtige Infos</div>
+            <div style={{ fontSize: 14, color: "#633806", lineHeight: 1.5 }}>{game.wichtige_infos}</div>
+          </div>
+        )}
+
         {mapsUrl && game.status !== "gebucht" && (
           <a href={mapsUrl} target="_blank" rel="noreferrer" style={{ display: "block", width: "100%", padding: 11, background: "#378ADD", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer", marginTop: 12, textAlign: "center", textDecoration: "none" }}>
             Navigation starten (Google Maps)
@@ -329,10 +331,7 @@ function BookingModal({ game, onClose, onConfirm }) {
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit() {
-    if (!form.name || !form.verein || !form.tel) {
-      alert("Bitte Name, Verein und Telefonnummer ausfüllen.");
-      return;
-    }
+    if (!form.name || !form.verein || !form.tel) { alert("Bitte Name, Verein und Telefonnummer ausfüllen."); return; }
     setLoading(true);
     await onConfirm(form);
     setLoading(false);
@@ -380,7 +379,6 @@ const FILTER_KATEGORIEN = ["Alle", "Angebote", "Anfragen", "Junioren", "Juniorin
 
 function ListeTab({ games, userLocation, laden, onSelectGame }) {
   const [activeFilter, setActiveFilter] = useState("Alle");
-
   const filtered = games.filter((g) => {
     const mannschaft = g.mannschaft || g.jugend || "";
     if (activeFilter === "Alle") return true;
@@ -388,7 +386,6 @@ function ListeTab({ games, userLocation, laden, onSelectGame }) {
     if (activeFilter === "Anfragen") return g.type === "anfrage";
     return getKategorie(mannschaft) === activeFilter;
   });
-
   return (
     <div>
       <div style={{ display: "flex", gap: 6, marginBottom: 14, overflowX: "auto", paddingBottom: 4 }}>
@@ -418,27 +415,23 @@ function EintragenTab({ onSubmit }) {
   const [form, setForm] = useState({
     datum: "", uhrzeit: "10:00", rasen: "Naturrasen",
     platz: "", adresse: "", trainer_name: "", telefon: "", verein: "",
+    spielfeld_groesse: "", spieldauer: "", wichtige_infos: "",
   });
 
   function set(key, val) { setForm((f) => ({ ...f, [key]: val })); }
 
   async function handleSubmit() {
-    if (!form.datum || !form.trainer_name || !form.verein) {
-      alert("Bitte Datum, Name und Verein ausfüllen.");
-      return;
-    }
+    if (!form.datum || !form.trainer_name || !form.verein) { alert("Bitte Datum, Name und Verein ausfüllen."); return; }
     setLaden(true);
     await onSubmit({ ...form, type, mannschaft, staerke, umkreis_km: type === "anfrage" ? umkreis : null });
-    setForm({ datum: "", uhrzeit: "10:00", rasen: "Naturrasen", platz: "", adresse: "", trainer_name: "", telefon: "", verein: "" });
-    setType("angebot");
-    setMannschaft("E-Jugend (U10)");
-    setStaerke(3);
-    setUmkreis(30);
+    setForm({ datum: "", uhrzeit: "10:00", rasen: "Naturrasen", platz: "", adresse: "", trainer_name: "", telefon: "", verein: "", spielfeld_groesse: "", spieldauer: "", wichtige_infos: "" });
+    setType("angebot"); setMannschaft("E-Jugend (U10)"); setStaerke(3); setUmkreis(30);
     setLaden(false);
   }
 
   const inputStyle = { width: "100%", padding: "8px 10px", border: "0.5px solid #ccc", borderRadius: 8, fontSize: 14 };
   const labelStyle = { display: "block", fontSize: 12, color: "#666", fontWeight: 500, marginBottom: 5 };
+  const optLabelStyle = { display: "block", fontSize: 12, color: "#666", fontWeight: 500, marginBottom: 5 };
   const sectionStyle = { background: "white", border: "0.5px solid #e5e5e5", borderRadius: 12, padding: "1.25rem", marginBottom: 10 };
 
   return (
@@ -455,12 +448,13 @@ function EintragenTab({ onSubmit }) {
         ))}
       </div>
 
-      {/* Mannschafts-Auswahl */}
+      {/* Mannschaft */}
       <div style={sectionStyle}>
         <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Mannschaft</div>
         <MannschaftAuswahl value={mannschaft} onChange={setMannschaft} />
       </div>
 
+      {/* Spieldaten */}
       <div style={sectionStyle}>
         <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Spieldaten</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
@@ -486,22 +480,75 @@ function EintragenTab({ onSubmit }) {
         </div>
       </div>
 
+      {/* Optionale Felder */}
+      <div style={sectionStyle}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em" }}>Weitere Angaben</div>
+          <span style={{ fontSize: 11, background: "#f0f0f0", color: "#999", padding: "2px 8px", borderRadius: 10 }}>optional</span>
+        </div>
+
+        {/* Spielfeldgröße */}
+        <div style={{ marginBottom: 12 }}>
+          <label style={optLabelStyle}>Spielfeldgröße</label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {SPIELFELD_GROESSEN.map((g) => {
+              const aktiv = form.spielfeld_groesse === g;
+              return (
+                <button key={g} onClick={() => set("spielfeld_groesse", aktiv ? "" : g)}
+                  style={{ padding: "7px 12px", borderRadius: 8, border: `0.5px solid ${aktiv ? "#185FA5" : "#e5e5e5"}`, background: aktiv ? "#E6F1FB" : "white", color: aktiv ? "#0C447C" : "#555", fontSize: 12, cursor: "pointer", fontWeight: aktiv ? 500 : 400 }}>
+                  {aktiv ? "✓ " : ""}{g}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Spieldauer */}
+        <div style={{ marginBottom: 12 }}>
+          <label style={optLabelStyle}>Spieldauer (Minuten)</label>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+            {[2 * 20, 2 * 25, 2 * 30, 2 * 35, 2 * 40, 2 * 45].map((min) => {
+              const aktiv = parseInt(form.spieldauer) === min;
+              return (
+                <button key={min} onClick={() => set("spieldauer", aktiv ? "" : min)}
+                  style={{ padding: "7px 14px", borderRadius: 8, border: `0.5px solid ${aktiv ? "#1D9E75" : "#e5e5e5"}`, background: aktiv ? "#E1F5EE" : "white", color: aktiv ? "#085041" : "#555", fontSize: 12, cursor: "pointer", fontWeight: aktiv ? 500 : 400 }}>
+                  {aktiv ? "✓ " : ""}{min} min
+                </button>
+              );
+            })}
+          </div>
+          <div style={{ marginTop: 8 }}>
+            <input type="number" placeholder="Oder eigene Dauer eingeben..." min={10} max={180} value={form.spieldauer} onChange={(e) => set("spieldauer", e.target.value)}
+              style={{ ...inputStyle, fontSize: 13 }} />
+          </div>
+        </div>
+
+        {/* Wichtige Infos */}
+        <div>
+          <label style={optLabelStyle}>Wichtige Infos</label>
+          <textarea
+            placeholder="z.B. Trikotfarbe, Parkplatzhinweise, Umkleiden vorhanden, Verpflegung..."
+            value={form.wichtige_infos}
+            onChange={(e) => set("wichtige_infos", e.target.value)}
+            rows={3}
+            style={{ ...inputStyle, resize: "vertical", lineHeight: 1.5 }}
+          />
+        </div>
+      </div>
+
+      {/* Umkreis bei Anfragen */}
       {type === "anfrage" && (
         <div style={sectionStyle}>
           <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Suchradius</div>
           <label style={labelStyle}>Maximaler Umkreis: {umkreis} km</label>
           <input type="range" min={5} max={150} step={5} value={umkreis} onChange={(e) => setUmkreis(parseInt(e.target.value))} style={{ width: "100%", marginBottom: 8 }} />
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#aaa" }}>
-            <span>5 km</span>
-            <span style={{ fontWeight: 500, color: "#3C3489" }}>{umkreis} km</span>
-            <span>150 km</span>
-          </div>
-          <div style={{ marginTop: 10, padding: "8px 12px", background: "#EEEDFE", borderRadius: 8, fontSize: 12, color: "#3C3489" }}>
-            Andere Trainer sehen, dass du einen Gegner im Umkreis von {umkreis} km suchst.
+            <span>5 km</span><span style={{ fontWeight: 500, color: "#3C3489" }}>{umkreis} km</span><span>150 km</span>
           </div>
         </div>
       )}
 
+      {/* Ort */}
       <div style={sectionStyle}>
         <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>
           {type === "angebot" ? "Ort" : "Dein Standort"}
@@ -521,11 +568,11 @@ function EintragenTab({ onSubmit }) {
           <div>
             <label style={labelStyle}>Deine Stadt / PLZ</label>
             <input type="text" style={inputStyle} placeholder="z.B. Mannheim oder 68159" value={form.adresse} onChange={(e) => set("adresse", e.target.value)} />
-            <div style={{ fontSize: 12, color: "#888", marginTop: 6 }}>Damit andere Trainer wissen wo du ungefähr bist.</div>
           </div>
         )}
       </div>
 
+      {/* Trainer */}
       <div style={sectionStyle}>
         <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Trainer & Verein</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
@@ -551,20 +598,35 @@ function EintragenTab({ onSubmit }) {
 function SucheTab({ games, userLocation, onSelectGame }) {
   const [results, setResults] = useState(null);
   const [km, setKm] = useState(30);
-  const [filter, setFilter] = useState({ kategorie: "", typ: "", datum: "", staerke: "", rasen: "" });
+  const [typ, setTyp] = useState("");
+  const [datum, setDatum] = useState("");
+  const [staerke, setStaerke] = useState("");
+  const [rasen, setRasen] = useState("");
+  const [aktiveKat, setAktiveKat] = useState("Alle");
+  const [ausgewaehlteMannschaften, setAusgewaehlteMannschaften] = useState([]);
 
-  function set(key, val) { setFilter((f) => ({ ...f, [key]: val })); }
+  function toggleMannschaft(m) {
+    setAusgewaehlteMannschaften((prev) => prev.includes(m) ? prev.filter((x) => x !== m) : [...prev, m]);
+  }
+
+  function resetFilter() {
+    setTyp(""); setDatum(""); setStaerke(""); setRasen("");
+    setAktiveKat("Alle"); setAusgewaehlteMannschaften([]);
+    setKm(30); setResults(null);
+  }
 
   function search() {
     const loc = userLocation;
     const res = games
       .filter((g) => {
         const mannschaft = g.mannschaft || g.jugend || "";
-        if (filter.kategorie && getKategorie(mannschaft) !== filter.kategorie) return false;
-        if (filter.typ && g.type !== filter.typ) return false;
-        if (filter.datum && g.datum < filter.datum) return false;
-        if (filter.staerke && g.staerke !== parseInt(filter.staerke)) return false;
-        if (filter.rasen && g.rasen !== filter.rasen) return false;
+        const kat = getKategorie(mannschaft);
+        if (aktiveKat !== "Alle" && kat !== aktiveKat) return false;
+        if (ausgewaehlteMannschaften.length > 0 && !ausgewaehlteMannschaften.includes(mannschaft)) return false;
+        if (typ && g.type !== typ) return false;
+        if (datum && g.datum < datum) return false;
+        if (staerke && g.staerke !== parseInt(staerke)) return false;
+        if (rasen && g.rasen !== rasen) return false;
         if (loc && g.lat && g.lng && haversine(loc.lat, loc.lng, g.lat, g.lng) > km) return false;
         return true;
       })
@@ -579,6 +641,7 @@ function SucheTab({ games, userLocation, onSelectGame }) {
 
   const selectStyle = { width: "100%", padding: "8px 10px", border: "0.5px solid #ccc", borderRadius: 8, fontSize: 14 };
   const labelStyle = { display: "block", fontSize: 12, color: "#666", fontWeight: 500, marginBottom: 5 };
+  const sectionStyle = { background: "white", border: "0.5px solid #e5e5e5", borderRadius: 12, padding: "1.25rem", marginBottom: 10 };
 
   return (
     <div>
@@ -587,48 +650,83 @@ function SucheTab({ games, userLocation, onSelectGame }) {
           ⚠️ Kein Standort gesetzt — bitte oben rechts deinen Standort eingeben für die Umkreissuche.
         </div>
       )}
-      <div style={{ background: "white", border: "0.5px solid #e5e5e5", borderRadius: 12, padding: "1.25rem", marginBottom: 10 }}>
-        <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Spiel finden</div>
+
+      <div style={sectionStyle}>
+        <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Mannschaft</div>
+        <div style={{ display: "flex", gap: 4, marginBottom: 10, background: "#f5f5f5", borderRadius: 10, padding: 4 }}>
+          {["Alle", ...Object.keys(MANNSCHAFTEN)].map((kat) => {
+            const c = kategorieColor(kat);
+            const aktiv = aktiveKat === kat;
+            const hatAuswahl = kat !== "Alle" && ausgewaehlteMannschaften.some((m) => getKategorie(m) === kat);
+            return (
+              <button key={kat} onClick={() => { setAktiveKat(kat); if (kat === "Alle") setAusgewaehlteMannschaften([]); }}
+                style={{ flex: 1, padding: "7px 4px", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 11, fontWeight: 500, background: aktiv ? (kat === "Alle" ? "#185FA5" : c.background) : "transparent", color: aktiv ? (kat === "Alle" ? "white" : c.color) : "#888" }}>
+                {kat}{hatAuswahl && <span style={{ display: "inline-block", width: 5, height: 5, background: c.color, borderRadius: "50%", marginLeft: 3, verticalAlign: "middle" }} />}
+              </button>
+            );
+          })}
+        </div>
+        {aktiveKat !== "Alle" && (
+          <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+            {MANNSCHAFTEN[aktiveKat].map((m) => {
+              const aktiv = ausgewaehlteMannschaften.includes(m);
+              const c = kategorieColor(aktiveKat);
+              return (
+                <button key={m} onClick={() => toggleMannschaft(m)}
+                  style={{ padding: "9px 14px", border: `0.5px solid ${aktiv ? c.color : "#e5e5e5"}`, borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: aktiv ? 500 : 400, textAlign: "left", background: aktiv ? c.background : "white", color: aktiv ? c.color : "#444" }}>
+                  {aktiv ? "✓ " : ""}{m}
+                </button>
+              );
+            })}
+            {ausgewaehlteMannschaften.length > 0 && (
+              <button onClick={() => setAusgewaehlteMannschaften([])}
+                style={{ padding: "7px 14px", border: "0.5px solid #ccc", borderRadius: 8, cursor: "pointer", fontSize: 12, background: "transparent", color: "#888" }}>
+                Auswahl zurücksetzen
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div style={sectionStyle}>
+        <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Weitere Filter</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
           <div>
-            <label style={labelStyle}>Kategorie</label>
-            <select style={selectStyle} value={filter.kategorie} onChange={(e) => set("kategorie", e.target.value)}>
-              <option value="">Alle</option>
-              {Object.keys(MANNSCHAFTEN).map((k) => <option key={k}>{k}</option>)}
-            </select>
-          </div>
-          <div>
             <label style={labelStyle}>Typ</label>
-            <select style={selectStyle} value={filter.typ} onChange={(e) => set("typ", e.target.value)}>
+            <select style={selectStyle} value={typ} onChange={(e) => setTyp(e.target.value)}>
               <option value="">Alle</option>
               <option value="angebot">Angebot</option>
               <option value="anfrage">Anfrage</option>
             </select>
           </div>
-        </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-          <div><label style={labelStyle}>Datum ab</label><input type="date" style={selectStyle} value={filter.datum} onChange={(e) => set("datum", e.target.value)} /></div>
           <div>
             <label style={labelStyle}>Spielstärke</label>
-            <select style={selectStyle} value={filter.staerke} onChange={(e) => set("staerke", e.target.value)}>
+            <select style={selectStyle} value={staerke} onChange={(e) => setStaerke(e.target.value)}>
               <option value="">Egal</option>
               {[1, 2, 3, 4, 5].map((n) => <option key={n}>{n}</option>)}
             </select>
           </div>
         </div>
-        <div style={{ marginBottom: 10 }}>
-          <label style={labelStyle}>Rasen</label>
-          <select style={selectStyle} value={filter.rasen} onChange={(e) => set("rasen", e.target.value)}>
-            <option value="">Egal</option>
-            {["Naturrasen", "Kunstrasen", "Hartplatz", "Halle"].map((r) => <option key={r}>{r}</option>)}
-          </select>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
+          <div><label style={labelStyle}>Datum ab</label><input type="date" style={selectStyle} value={datum} onChange={(e) => setDatum(e.target.value)} /></div>
+          <div>
+            <label style={labelStyle}>Rasen</label>
+            <select style={selectStyle} value={rasen} onChange={(e) => setRasen(e.target.value)}>
+              <option value="">Egal</option>
+              {["Naturrasen", "Kunstrasen", "Hartplatz", "Halle"].map((r) => <option key={r}>{r}</option>)}
+            </select>
+          </div>
         </div>
         <div style={{ marginBottom: 14 }}>
           <label style={labelStyle}>Umkreis: {km} km{userLocation ? ` (ab ${userLocation.label})` : " (kein Standort gesetzt)"}</label>
           <input type="range" min={5} max={150} step={5} value={km} onChange={(e) => setKm(parseInt(e.target.value))} style={{ width: "100%" }} />
         </div>
-        <button onClick={search} style={{ width: "100%", padding: 12, background: "#185FA5", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: "pointer" }}>Suchen</button>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          <button onClick={resetFilter} style={{ padding: 11, background: "white", color: "#666", border: "0.5px solid #ccc", borderRadius: 8, fontSize: 14, cursor: "pointer" }}>Zurücksetzen</button>
+          <button onClick={search} style={{ padding: 11, background: "#185FA5", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer" }}>Suchen</button>
+        </div>
       </div>
+
       {results !== null && (
         results.length === 0
           ? <div style={{ textAlign: "center", padding: "2rem", color: "#aaa" }}>Keine Spiele gefunden</div>
@@ -645,11 +743,7 @@ function MeineTab({ games, userLocation, onSelectGame }) {
   if (gebucht.length === 0) {
     return <div style={{ textAlign: "center", padding: "3rem 1rem", color: "#aaa" }}>Noch keine gebuchten Spiele.<br />Finde ein Spiel im Tab „Spiele"!</div>;
   }
-  return (
-    <div>
-      {gebucht.map((g) => <GameCard key={g.id} game={g} userLocation={userLocation} onClick={onSelectGame} />)}
-    </div>
-  );
+  return <div>{gebucht.map((g) => <GameCard key={g.id} game={g} userLocation={userLocation} onClick={onSelectGame} />)}</div>;
 }
 
 // ─── Haupt-App ─────────────────────────────────────────────────────────────────
@@ -678,10 +772,7 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (!session) return;
-    ladeSpiele();
-  }, [session]);
+  useEffect(() => { if (!session) return; ladeSpiele(); }, [session]);
 
   async function ladeSpiele() {
     setLaden(true);
@@ -692,32 +783,29 @@ export default function App() {
 
   if (!session) return <Login />;
 
-  function showToast(msg) {
-    setToast(msg);
-    setTimeout(() => setToast(""), 2500);
-  }
+  function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 2500); }
 
   async function handleAddGame(formData) {
-    const { data, error } = await supabase
-      .from("games")
-      .insert([{
-        type: formData.type,
-        mannschaft: formData.mannschaft,
-        datum: formData.datum,
-        uhrzeit: formData.uhrzeit,
-        rasen: formData.rasen,
-        staerke: formData.staerke,
-        platz: formData.platz || null,
-        adresse: formData.adresse || null,
-        trainer_name: formData.trainer_name,
-        telefon: formData.telefon,
-        verein: formData.verein,
-        status: "offen",
-        umkreis_km: formData.umkreis_km || null,
-        lat: null,
-        lng: null,
-      }])
-      .select();
+    const { data, error } = await supabase.from("games").insert([{
+      type: formData.type,
+      mannschaft: formData.mannschaft,
+      datum: formData.datum,
+      uhrzeit: formData.uhrzeit,
+      rasen: formData.rasen,
+      staerke: formData.staerke,
+      platz: formData.platz || null,
+      adresse: formData.adresse || null,
+      trainer_name: formData.trainer_name,
+      telefon: formData.telefon,
+      verein: formData.verein,
+      status: "offen",
+      umkreis_km: formData.umkreis_km || null,
+      spielfeld_groesse: formData.spielfeld_groesse || null,
+      spieldauer: formData.spieldauer ? parseInt(formData.spieldauer) : null,
+      wichtige_infos: formData.wichtige_infos || null,
+      lat: null,
+      lng: null,
+    }]).select();
     if (error) { alert("Fehler beim Speichern: " + error.message); return; }
     if (data) setGames((prev) => [data[0], ...prev]);
     showToast("✓ Erfolgreich veröffentlicht!");
@@ -743,7 +831,6 @@ export default function App() {
 
   return (
     <div style={{ maxWidth: 680, margin: "0 auto", padding: "1rem", fontFamily: "system-ui, sans-serif", color: "#1a1a1a" }}>
-
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: "1rem" }}>
         <div style={{ width: 32, height: 32, background: "#1D9E75", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18 }}>⚽</div>
         <div>
@@ -781,12 +868,8 @@ export default function App() {
       {selectedGame && currentGame && (
         <DetailModal game={currentGame} userLocation={userLocation} onClose={() => setSelectedGame(null)} onBook={(g) => { setSelectedGame(null); setBookingGame(g); }} />
       )}
-      {bookingGame && (
-        <BookingModal game={bookingGame} onClose={() => setBookingGame(null)} onConfirm={handleConfirmBooking} />
-      )}
-      {showStandortModal && (
-        <StandortModal onClose={() => setShowStandortModal(false)} onSave={handleSaveStandort} />
-      )}
+      {bookingGame && <BookingModal game={bookingGame} onClose={() => setBookingGame(null)} onConfirm={handleConfirmBooking} />}
+      {showStandortModal && <StandortModal onClose={() => setShowStandortModal(false)} onSave={handleSaveStandort} />}
     </div>
   );
 }
