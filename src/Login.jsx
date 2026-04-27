@@ -3,6 +3,7 @@ import { supabase } from "./supabaseClient";
 
 export default function Login() {
   const [mode, setMode] = useState("login");
+  const [rolle, setRolle] = useState("trainer");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [datenschutz, setDatenschutz] = useState(false);
@@ -22,7 +23,10 @@ export default function Login() {
     setLoading(true); setError(""); setSuccess("");
     if (password.length < 6) { setError("Passwort muss mindestens 6 Zeichen lang sein."); setLoading(false); return; }
     if (!datenschutz) { setError("Bitte stimme der Datenschutzerklärung zu."); setLoading(false); return; }
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { error } = await supabase.auth.signUp({
+      email, password,
+      options: { data: { rolle } }, // Rolle wird in user_metadata gespeichert
+    });
     if (error) setError("Registrierung fehlgeschlagen: " + error.message);
     else setSuccess("Registrierung erfolgreich! Du kannst dich jetzt anmelden.");
     setLoading(false);
@@ -34,14 +38,19 @@ export default function Login() {
     else handleRegister();
   }
 
+  const rollenOptionen = [
+    { val: "trainer", label: "⚽ Trainer", desc: "Spiele anbieten & anfragen" },
+    { val: "schiedsrichter", label: "🟡 Schiedsrichter", desc: "Spiele pfeifen & Einsätze finden" },
+  ];
+
   return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#f0f2f5", padding: 16 }}>
-      <div style={{ background: "white", border: "1px solid #e0e0e0", borderRadius: 16, padding: "2rem", width: "100%", maxWidth: 380, boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
+      <div style={{ background: "white", border: "1px solid #e0e0e0", borderRadius: 16, padding: "2rem", width: "100%", maxWidth: 400, boxShadow: "0 4px 24px rgba(0,0,0,0.08)" }}>
 
         {/* Logo */}
         <div style={{ textAlign: "center", marginBottom: "1.75rem" }}>
           <div style={{ width: 52, height: 52, background: "#1D9E75", borderRadius: 14, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 26, margin: "0 auto 12px" }}>⚽</div>
-          <div style={{ fontSize: 22, fontWeight: 600, color: "#1a1a1a" }}>KickMatch</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: "#1a1a1a" }}>KickMatch</div>
           <div style={{ fontSize: 13, color: "#777", marginTop: 4 }}>Freundschaftsspiele koordinieren</div>
         </div>
 
@@ -49,11 +58,28 @@ export default function Login() {
         <div style={{ display: "flex", background: "#f0f2f5", borderRadius: 10, padding: 4, marginBottom: "1.25rem" }}>
           {[{ val: "login", label: "Anmelden" }, { val: "register", label: "Registrieren" }].map((btn) => (
             <button key={btn.val} onClick={() => { setMode(btn.val); setError(""); setSuccess(""); }}
-              style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", background: mode === btn.val ? "white" : "transparent", color: mode === btn.val ? "#1a1a1a" : "#888", boxShadow: mode === btn.val ? "0 1px 4px rgba(0,0,0,0.1)" : "none", transition: "all .15s" }}>
+              style={{ flex: 1, padding: "9px 0", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 500, cursor: "pointer", background: mode === btn.val ? "white" : "transparent", color: mode === btn.val ? "#1a1a1a" : "#888", boxShadow: mode === btn.val ? "0 1px 4px rgba(0,0,0,0.1)" : "none" }}>
               {btn.label}
             </button>
           ))}
         </div>
+
+        {/* Rollenauswahl — nur bei Registrierung */}
+        {mode === "register" && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: "#555", marginBottom: 8 }}>Ich bin...</div>
+            <div style={{ display: "flex", gap: 8 }}>
+              {rollenOptionen.map((r) => (
+                <button key={r.val} onClick={() => setRolle(r.val)}
+                  style={{ flex: 1, padding: "12px 8px", border: `2px solid ${rolle === r.val ? "#1D9E75" : "#ddd"}`, borderRadius: 10, cursor: "pointer", background: rolle === r.val ? "#E1F5EE" : "white", textAlign: "center" }}>
+                  <div style={{ fontSize: 16, marginBottom: 4 }}>{r.label.split(" ")[0]}</div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: rolle === r.val ? "#085041" : "#444" }}>{r.label.split(" ").slice(1).join(" ")}</div>
+                  <div style={{ fontSize: 11, color: rolle === r.val ? "#0F6E56" : "#888", marginTop: 2 }}>{r.desc}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Fehler / Erfolg */}
         {error && <div style={{ background: "#FCEBEB", border: "1px solid #F09595", borderRadius: 8, padding: "10px 12px", fontSize: 13, color: "#791F1F", marginBottom: 14 }}>{error}</div>}
@@ -72,33 +98,27 @@ export default function Login() {
             autoComplete={mode === "login" ? "current-password" : "new-password"} />
         </div>
 
-        {/* Datenschutz-Zustimmung — nur bei Registrierung */}
+        {/* Datenschutz */}
         {mode === "register" && (
           <div style={{ marginBottom: 20 }}>
             <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: "pointer" }}>
-              <input type="checkbox" checked={datenschutz} onChange={(e) => setDatenschutz(e.target.checked)}
-                style={{ width: 18, height: 18, marginTop: 1, flexShrink: 0, accentColor: "#1D9E75" }} />
+              <input type="checkbox" checked={datenschutz} onChange={(e) => setDatenschutz(e.target.checked)} style={{ width: 18, height: 18, marginTop: 1, flexShrink: 0, accentColor: "#1D9E75" }} />
               <span style={{ fontSize: 13, color: "#555", lineHeight: 1.5 }}>
                 Ich habe die{" "}
-                <span onClick={(e) => { e.preventDefault(); setShowDatenschutz(true); }}
-                  style={{ color: "#185FA5", textDecoration: "underline", cursor: "pointer" }}>
-                  Datenschutzerklärung
-                </span>{" "}
-                gelesen und stimme der Verarbeitung meiner Daten zu.
+                <span onClick={(e) => { e.preventDefault(); setShowDatenschutz(true); }} style={{ color: "#185FA5", textDecoration: "underline", cursor: "pointer" }}>Datenschutzerklärung</span>{" "}
+                gelesen und stimme zu.
               </span>
             </label>
           </div>
         )}
 
-        {/* Submit */}
         <button onClick={handleSubmit} disabled={loading}
-          style={{ width: "100%", padding: "12px 0", background: loading ? "#aaa" : "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: loading ? "not-allowed" : "pointer" }}>
+          style={{ width: "100%", padding: "12px 0", background: loading ? "#aaa" : "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: loading ? "not-allowed" : "pointer" }}>
           {loading ? "Bitte warten..." : mode === "login" ? "Anmelden" : "Konto erstellen"}
         </button>
 
-        {/* Hinweis */}
         <div style={{ fontSize: 11, color: "#aaa", textAlign: "center", marginTop: 14, lineHeight: 1.6 }}>
-          Deine Daten werden ausschließlich für KickMatch verwendet und nicht an Dritte weitergegeben.
+          Deine Daten werden ausschließlich für KickMatch verwendet.
         </div>
       </div>
 
@@ -106,52 +126,25 @@ export default function Login() {
       {showDatenschutz && (
         <div onClick={() => setShowDatenschutz(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300, padding: 16 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: "white", borderRadius: 16, padding: "1.5rem", maxWidth: 480, width: "100%", maxHeight: "80vh", overflowY: "auto", position: "relative" }}>
-            <button onClick={() => setShowDatenschutz(false)} style={{ position: "absolute", top: 12, right: 12, width: 28, height: 28, borderRadius: "50%", border: "1px solid #e0e0e0", background: "#f5f5f5", cursor: "pointer", fontSize: 13, color: "#666" }}>✕</button>
-
-            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 16, color: "#1a1a1a" }}>Datenschutzerklärung</div>
-
+            <button onClick={() => setShowDatenschutz(false)} style={{ position: "absolute", top: 12, right: 12, width: 28, height: 28, borderRadius: "50%", border: "1px solid #e0e0e0", background: "#f5f5f5", cursor: "pointer", fontSize: 13 }}>✕</button>
+            <div style={{ fontSize: 18, fontWeight: 700, marginBottom: 16 }}>Datenschutzerklärung</div>
             {[
-              {
-                titel: "1. Verantwortlicher",
-                text: "Verantwortlich für die Datenverarbeitung ist der Betreiber der KickMatch-Plattform. Bei Fragen zum Datenschutz wende dich bitte per E-Mail an den Betreiber."
-              },
-              {
-                titel: "2. Welche Daten wir speichern",
-                text: "Wir speichern folgende Daten: E-Mail-Adresse (für Login und Kommunikation), Name und Telefonnummer des Trainers (für Spielangebote und -anfragen), Vereinsname, Datum, Uhrzeit und Ort von Spielen sowie technische Zugriffsdaten (IP-Adresse, Browser)."
-              },
-              {
-                titel: "3. Zweck der Datenverarbeitung",
-                text: "Deine Daten werden ausschließlich zur Koordination von Freundschaftsspielen zwischen Fußballtrainern verwendet. Kontaktdaten (Name, Telefon) werden für andere angemeldete Trainer sichtbar, um die direkte Kontaktaufnahme zu ermöglichen."
-              },
-              {
-                titel: "4. Rechtsgrundlage",
-                text: "Die Datenverarbeitung erfolgt auf Grundlage deiner Einwilligung (Art. 6 Abs. 1 lit. a DSGVO) sowie zur Erfüllung des Nutzungsvertrags (Art. 6 Abs. 1 lit. b DSGVO)."
-              },
-              {
-                titel: "5. Speicherdauer",
-                text: "Deine Daten werden gespeichert, solange du ein aktives Konto bei KickMatch hast. Nach Löschung deines Kontos werden alle personenbezogenen Daten innerhalb von 30 Tagen entfernt."
-              },
-              {
-                titel: "6. Weitergabe an Dritte",
-                text: "Deine Daten werden nicht an Dritte verkauft oder zu Werbezwecken weitergegeben. Wir nutzen Supabase als Datenbankdienstleister (Server in der EU/Frankfurt). Supabase ist nach DSGVO-Standards zertifiziert."
-              },
-              {
-                titel: "7. Deine Rechte",
-                text: "Du hast jederzeit das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung deiner gespeicherten Daten. Außerdem hast du das Recht auf Datenübertragbarkeit und das Recht, deine Einwilligung zu widerrufen."
-              },
-              {
-                titel: "8. Cookies",
-                text: "KickMatch verwendet ausschließlich technisch notwendige Cookies für die Anmeldung (Session-Cookie). Es werden keine Tracking- oder Werbe-Cookies eingesetzt."
-              },
-            ].map((abschnitt) => (
-              <div key={abschnitt.titel} style={{ marginBottom: 16 }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", marginBottom: 4 }}>{abschnitt.titel}</div>
-                <div style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>{abschnitt.text}</div>
+              { titel: "1. Verantwortlicher", text: "Verantwortlich für die Datenverarbeitung ist der Betreiber der KickMatch-Plattform." },
+              { titel: "2. Gespeicherte Daten", text: "E-Mail-Adresse, Name, Telefonnummer, Vereinsname, Lizenzinformationen (Schiedsrichter), Spieldaten sowie technische Zugriffsdaten." },
+              { titel: "3. Zweck", text: "Koordination von Freundschaftsspielen und Schiedsrichter-Einsätzen. Kontaktdaten sind für angemeldete Nutzer sichtbar." },
+              { titel: "4. Rechtsgrundlage", text: "Einwilligung (Art. 6 Abs. 1 lit. a DSGVO) und Vertragserfüllung (Art. 6 Abs. 1 lit. b DSGVO)." },
+              { titel: "5. Speicherdauer", text: "Bis zur Löschung des Kontos. Danach werden alle Daten innerhalb von 30 Tagen entfernt." },
+              { titel: "6. Drittanbieter", text: "Supabase (Datenbankserver Frankfurt/EU, DSGVO-konform). Keine Weitergabe zu Werbezwecken." },
+              { titel: "7. Deine Rechte", text: "Auskunft, Berichtigung, Löschung, Einschränkung, Datenübertragbarkeit und Widerruf der Einwilligung." },
+              { titel: "8. Cookies", text: "Nur technisch notwendige Session-Cookies. Keine Tracking- oder Werbe-Cookies." },
+            ].map((a) => (
+              <div key={a.titel} style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: "#1a1a1a", marginBottom: 4 }}>{a.titel}</div>
+                <div style={{ fontSize: 13, color: "#555", lineHeight: 1.6 }}>{a.text}</div>
               </div>
             ))}
-
             <button onClick={() => { setShowDatenschutz(false); setDatenschutz(true); }}
-              style={{ width: "100%", padding: 12, background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, cursor: "pointer", marginTop: 8 }}>
+              style={{ width: "100%", padding: 12, background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer", marginTop: 8 }}>
               Verstanden & Zustimmen
             </button>
           </div>
