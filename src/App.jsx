@@ -134,6 +134,52 @@ function SortierBar({ sortBy, onChange, userLocation }) {
   );
 }
 
+// ─── In-App Benachrichtigungen Banner ──────────────────────────────────────────
+
+function BenachrichtigungenBanner({ session, onNavigateMeine }) {
+  const [ungelesen, setUngelesen] = useState([]);
+
+  useEffect(() => {
+    if (!session) return;
+    // Ungelesene Buchungen laden wo ich Anbieter bin (anbieter_email = meine E-Mail)
+    supabase
+      .from("buchungen")
+      .select("*")
+      .eq("anbieter_email", session.user.email)
+      .eq("gelesen", false)
+      .then(({ data }) => { if (data) setUngelesen(data); });
+  }, [session]);
+
+  async function allesGelesen() {
+    const ids = ungelesen.map((b) => b.id);
+    await supabase.from("buchungen").update({ gelesen: true }).in("id", ids);
+    setUngelesen([]);
+    onNavigateMeine();
+  }
+
+  if (ungelesen.length === 0) return null;
+
+  return (
+    <div style={{ background: "#E6F1FB", border: "1.5px solid #B5D4F4", borderRadius: 12, padding: "12px 16px", marginBottom: 14, display: "flex", alignItems: "center", gap: 12 }}>
+      <div style={{ width: 32, height: 32, background: "#185FA5", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+        <span style={{ color: "white", fontSize: 14, fontWeight: 700 }}>{ungelesen.length}</span>
+      </div>
+      <div style={{ flex: 1 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: "#0C447C", marginBottom: 2 }}>
+          {ungelesen.length === 1 ? "1 Spiel wurde angenommen!" : `${ungelesen.length} Spiele wurden angenommen!`}
+        </div>
+        <div style={{ fontSize: 12, color: "#185FA5" }}>
+          {ungelesen.map((b) => `${b.bucher_verein} · ${b.datum}`).join(" | ")}
+        </div>
+      </div>
+      <button onClick={allesGelesen}
+        style={{ padding: "7px 14px", background: "#185FA5", color: "white", border: "none", borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: "pointer", flexShrink: 0 }}>
+        Ansehen
+      </button>
+    </div>
+  );
+}
+
 // ─── Standort-Modal ────────────────────────────────────────────────────────────
 
 function StandortModal({ onClose, onSave }) {
@@ -262,7 +308,7 @@ function GameCard({ game, userLocation, onClick }) {
   );
 }
 
-// ─── Gebuchte Spiele Karte (mit Buchungsdetails) ───────────────────────────────
+// ─── Gebuchte Spiele Karte ─────────────────────────────────────────────────────
 
 function GebuchteSpielKarte({ game, buchung, userLocation, onClick }) {
   const dist = userLocation && game.lat && game.lng ? haversine(userLocation.lat, userLocation.lng, game.lat, game.lng) : null;
@@ -286,24 +332,22 @@ function GebuchteSpielKarte({ game, buchung, userLocation, onClick }) {
           <span style={{ fontSize: 12, color: "#777", fontWeight: 500 }}>{formatDate(game.datum)}</span>
         </div>
       </div>
-
       <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", marginBottom: 2 }}>vs. {game.verein}</div>
       <div style={{ fontSize: 13, color: "#555", marginBottom: 8 }}>{mannschaft}</div>
       <div style={{ height: 1, background: "#f0f0f0", marginBottom: 8 }} />
-
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
         <span style={{ fontSize: 12, color: "#666" }}>🕐 {game.uhrzeit} Uhr</span>
         {game.platz && <span style={{ fontSize: 12, color: "#666" }}>📍 {game.platz}</span>}
         <span style={{ fontSize: 12, color: "#666" }}>🌿 {game.rasen}</span>
       </div>
-
-      {/* Kontaktdaten des Gegners */}
-      <div style={{ background: "#f8f8f8", borderRadius: 8, padding: "10px 12px", border: "1px solid #ebebeb" }}>
-        <div style={{ fontSize: 11, color: "#999", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Kontakt Gegner</div>
-        <div style={{ fontSize: 13, color: "#1a1a1a", fontWeight: 600, marginBottom: 2 }}>{buchung.anbieter_name}</div>
-        <div style={{ fontSize: 13, color: "#1a1a1a", marginBottom: 2 }}>{buchung.anbieter_verein}</div>
-        <div style={{ fontSize: 13, color: "#185FA5", fontWeight: 500 }}>{buchung.anbieter_tel}</div>
-      </div>
+      {buchung && (
+        <div style={{ background: "#f8f8f8", borderRadius: 8, padding: "10px 12px", border: "1px solid #ebebeb" }}>
+          <div style={{ fontSize: 11, color: "#999", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Kontakt Gegner</div>
+          <div style={{ fontSize: 13, color: "#1a1a1a", fontWeight: 600, marginBottom: 2 }}>{buchung.anbieter_name}</div>
+          <div style={{ fontSize: 13, color: "#1a1a1a", marginBottom: 2 }}>{buchung.anbieter_verein}</div>
+          <div style={{ fontSize: 13, color: "#185FA5", fontWeight: 500 }}>{buchung.anbieter_tel}</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -374,7 +418,7 @@ function SchiriBewerbungModal({ game, onClose, onConfirm }) {
         {[
           { label: "Dein Name", key: "name", type: "text", placeholder: "Vor- und Nachname" },
           { label: "Deine Telefonnummer", key: "telefon", type: "tel", placeholder: "+49 ..." },
-          { label: "Nachricht (optional)", key: "nachricht", type: "text", placeholder: "z.B. Ich habe Erfahrung mit dieser Altersklasse..." },
+          { label: "Nachricht (optional)", key: "nachricht", type: "text", placeholder: "z.B. Erfahrung mit dieser Altersklasse..." },
         ].map((f) => (
           <div key={f.key} style={{ marginBottom: 10 }}>
             <label style={lbl}>{f.label}</label>
@@ -558,9 +602,6 @@ function BookingModal({ game, session, onClose, onConfirm }) {
       <div onClick={(e) => e.stopPropagation()} style={{ background: "white", borderRadius: 16, padding: "1.5rem", maxWidth: 440, width: "100%", maxHeight: "85vh", overflowY: "auto", border: "1px solid #e0e0e0", boxShadow: "0 8px 32px rgba(0,0,0,0.15)" }}>
         <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>Buchung abschließen</div>
         <div style={{ fontSize: 13, color: "#777", marginBottom: 16 }}>{game.verein} · {formatDate(game.datum)} · {game.uhrzeit} Uhr</div>
-        <div style={{ background: "#E6F1FB", border: "1px solid #B5D4F4", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#0C447C" }}>
-          📧 Beide Trainer erhalten eine Bestätigungs-E-Mail mit den Kontaktdaten.
-        </div>
         {[
           { label: "Dein Name", key: "name", type: "text", placeholder: "Vor- und Nachname" },
           { label: "Dein Verein", key: "verein", type: "text", placeholder: "z.B. FC Musterstadt" },
@@ -905,18 +946,13 @@ function MeineTab({ userLocation, onSelectGame, session }) {
 
   useEffect(() => {
     async function ladeMeine() {
-      // Alle Buchungen wo ich als Bucher beteiligt bin
       const { data: buchungen } = await supabase
         .from("buchungen")
         .select("*")
         .eq("bucher_email", session.user.email);
 
-      if (!buchungen || buchungen.length === 0) {
-        setLaden(false);
-        return;
-      }
+      if (!buchungen || buchungen.length === 0) { setLaden(false); return; }
 
-      // Die zugehörigen Spiele laden
       const gameIds = buchungen.map((b) => b.game_id);
       const { data: spiele } = await supabase
         .from("games")
@@ -945,20 +981,12 @@ function MeineTab({ userLocation, onSelectGame, session }) {
   return (
     <div>
       <div style={{ background: "#FCEBEB", border: "1.5px solid #F09595", borderRadius: 12, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#791F1F" }}>
-        <strong>{sortiert.length} gebuchte {sortiert.length === 1 ? "Spiel" : "Spiele"}</strong> — Kontaktdaten des Gegners sind direkt auf der Karte sichtbar.
+        <strong>{sortiert.length} gebuchte {sortiert.length === 1 ? "Spiel" : "Spiele"}</strong> — Kontaktdaten des Gegners sind direkt sichtbar.
       </div>
       <SortierBar sortBy={sortBy} onChange={setSortBy} userLocation={userLocation} />
       {sortiert.map((g) => {
         const buchung = meineBuchungen.find((b) => b.game_id === g.id);
-        return (
-          <GebuchteSpielKarte
-            key={g.id}
-            game={g}
-            buchung={buchung}
-            userLocation={userLocation}
-            onClick={onSelectGame}
-          />
-        );
+        return <GebuchteSpielKarte key={g.id} game={g} buchung={buchung} userLocation={userLocation} onClick={onSelectGame} />;
       })}
     </div>
   );
@@ -1036,15 +1064,15 @@ export default function App() {
       .update({ status: "gebucht" })
       .eq("id", bookingGame.id);
 
-    if (updateError) { alert("Fehler beim Buchen: " + updateError.message); return; }
+    if (updateError) { alert("Fehler: " + updateError.message); return; }
 
-    // 2. Buchung dauerhaft speichern
-    const buchungsDaten = {
+    // 2. Buchung in Supabase speichern — gelesen: false damit Anbieter Benachrichtigung sieht
+    await supabase.from("buchungen").insert([{
       game_id: bookingGame.id,
       anbieter_name: bookingGame.trainer_name,
       anbieter_tel: bookingGame.telefon,
       anbieter_verein: bookingGame.verein,
-      anbieter_email: session.user.email,
+      anbieter_email: bookingGame.anbieter_email || "",
       bucher_name: bookingData.name,
       bucher_verein: bookingData.verein,
       bucher_tel: bookingData.tel,
@@ -1053,21 +1081,13 @@ export default function App() {
       bucher_email: session.user.email,
       datum: formatDate(bookingGame.datum),
       uhrzeit: bookingGame.uhrzeit,
-    };
+      gelesen: false, // Anbieter hat noch nicht gesehen
+    }]);
 
-    await supabase.from("buchungen").insert([buchungsDaten]);
-
-    // 3. E-Mail-Benachrichtigung senden
-    try {
-      await supabase.functions.invoke("buchung-bestaetigung", { body: buchungsDaten });
-    } catch (err) {
-      console.error("E-Mail konnte nicht gesendet werden:", err);
-    }
-
-    // 4. State aktualisieren
+    // 3. State aktualisieren
     setGames((prev) => prev.map((g) => g.id === bookingGame.id ? { ...g, status: "gebucht" } : g));
     setBookingGame(null);
-    showToast("Spiel gebucht! Bestätigungs-E-Mail wurde versendet.");
+    showToast("Spiel erfolgreich gebucht!");
     setActiveTab("meine");
   }
 
@@ -1097,6 +1117,14 @@ export default function App() {
         </div>
       </div>
 
+      {/* In-App Benachrichtigung Banner */}
+      {!istSchiri && session && (
+        <BenachrichtigungenBanner
+          session={session}
+          onNavigateMeine={() => setActiveTab("meine")}
+        />
+      )}
+
       <Toast message={toast} />
 
       {/* Tab-Bar */}
@@ -1114,36 +1142,17 @@ export default function App() {
       {activeTab === "suche" && <SucheTab games={games} userLocation={userLocation} onSelectGame={setSelectedGame} />}
       {activeTab === "boerse" && <SchiriBörseTab games={games} userLocation={userLocation} session={session} onRefresh={ladeSpiele} />}
       {activeTab === "meine" && !istSchiri && (
-        <MeineTab
-          userLocation={userLocation}
-          onSelectGame={setSelectedGame}
-          session={session}
-        />
+        <MeineTab userLocation={userLocation} onSelectGame={setSelectedGame} session={session} />
       )}
 
       {selectedGame && currentGame && (
-        <DetailModal
-          game={currentGame}
-          userLocation={userLocation}
-          session={session}
-          onClose={() => setSelectedGame(null)}
-          onBook={(g) => { setSelectedGame(null); setBookingGame(g); }}
-          onRefresh={ladeSpiele}
-        />
+        <DetailModal game={currentGame} userLocation={userLocation} session={session} onClose={() => setSelectedGame(null)} onBook={(g) => { setSelectedGame(null); setBookingGame(g); }} onRefresh={ladeSpiele} />
       )}
       {bookingGame && (
-        <BookingModal
-          game={bookingGame}
-          session={session}
-          onClose={() => setBookingGame(null)}
-          onConfirm={handleConfirmBooking}
-        />
+        <BookingModal game={bookingGame} session={session} onClose={() => setBookingGame(null)} onConfirm={handleConfirmBooking} />
       )}
       {showStandortModal && (
-        <StandortModal
-          onClose={() => setShowStandortModal(false)}
-          onSave={(loc) => { setUserLocation(loc); setShowStandortModal(false); showToast(`Standort: ${loc.label}`); }}
-        />
+        <StandortModal onClose={() => setShowStandortModal(false)} onSave={(loc) => { setUserLocation(loc); setShowStandortModal(false); showToast(`Standort: ${loc.label}`); }} />
       )}
     </div>
   );
