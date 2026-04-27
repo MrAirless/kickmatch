@@ -12,7 +12,6 @@ const MANNSCHAFTEN = {
 };
 
 const SPIELFELD_GROESSEN = ["Vollfeld (11 vs 11)", "Großfeld (9 vs 9)", "Mittelfeld (7 vs 7)", "Kleinfeld (5 vs 5)", "Futsal"];
-
 const SCHIRI_LIZENZEN = ["DFB-Schiedsrichter (Kreisklasse)", "DFB-Schiedsrichter (Bezirksliga)", "DFB-Schiedsrichter (Landesliga)", "DFB-Schiedsrichter (Verbandsliga)", "FIFA-Schiedsrichter", "Sonstige"];
 
 // ─── Hilfsfunktionen ───────────────────────────────────────────────────────────
@@ -183,8 +182,7 @@ function StandortModal({ onClose, onSave }) {
         <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
           <div style={{ flex: 1, height: 1, background: "#e5e5e5" }} /><span style={{ fontSize: 12, color: "#aaa" }}>oder</span><div style={{ flex: 1, height: 1, background: "#e5e5e5" }} />
         </div>
-        <input type="text" placeholder="z.B. Mannheim oder 68159" value={stadtInput} onChange={(e) => setStadtInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && useStadt()}
-          style={{ ...inp, marginBottom: 10 }} />
+        <input type="text" placeholder="z.B. Mannheim oder 68159" value={stadtInput} onChange={(e) => setStadtInput(e.target.value)} onKeyDown={(e) => e.key === "Enter" && useStadt()} style={{ ...inp, marginBottom: 10 }} />
         <button onClick={useStadt} disabled={loading} style={{ width: "100%", padding: 11, background: "#185FA5", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Standort bestätigen</button>
         {error && <div style={{ marginTop: 12, padding: "8px 12px", background: "#FCEBEB", borderRadius: 8, fontSize: 13, color: "#791F1F" }}>{error}</div>}
       </div>
@@ -236,11 +234,7 @@ function GameCard({ game, userLocation, onClick }) {
           <Badge variant={game.type === "angebot" ? "offer" : "search"}>{game.type === "angebot" ? "⚽ Angebot" : "🔍 Anfrage"}</Badge>
           {kat && <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: c.bg, color: c.text, border: `1px solid ${c.border}` }}>{kat}</span>}
           {game.status === "gebucht" && <Badge variant="green">✓ Gebucht</Badge>}
-          {game.schiri_benoetigt && (
-            <Badge variant={game.schiri_status === "besetzt" ? "green" : "yellow"}>
-              🟡 {game.schiri_status === "besetzt" ? "Schiri bestätigt" : "Schiri gesucht"}
-            </Badge>
-          )}
+          {game.schiri_benoetigt && <Badge variant={game.schiri_status === "besetzt" ? "green" : "yellow"}>🟡 {game.schiri_status === "besetzt" ? "Schiri ✓" : "Schiri gesucht"}</Badge>}
         </div>
         <div style={{ display: "flex", gap: 5, alignItems: "center", flexShrink: 0, marginLeft: 8 }}>
           {dist !== null && <Badge variant="gray">{dist} km</Badge>}
@@ -268,34 +262,13 @@ function GameCard({ game, userLocation, onClick }) {
   );
 }
 
-// ─── Schiedsrichter-Karte ──────────────────────────────────────────────────────
-
-function SchiriCard({ schiri, userLocation, onBewerben }) {
-  const dist = userLocation && schiri.lat && schiri.lng ? haversine(userLocation.lat, userLocation.lng, schiri.lat, schiri.lng) : null;
-  return (
-    <div style={{ background: "white", border: "1.5px solid #e0e0e0", borderRadius: 12, padding: "1rem 1.25rem", marginBottom: 10, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-        <div style={{ display: "flex", gap: 5 }}>
-          <Badge variant="yellow">🟡 Schiedsrichter</Badge>
-          {schiri.aktiv && <Badge variant="green">Verfügbar</Badge>}
-        </div>
-        {dist !== null && <Badge variant="gray">{dist} km</Badge>}
-      </div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", marginBottom: 2 }}>{schiri.name}</div>
-      {schiri.lizenz && <div style={{ fontSize: 13, color: "#555", marginBottom: 6 }}>{schiri.lizenz}</div>}
-      {schiri.region && <div style={{ fontSize: 12, color: "#888" }}>📍 Region: {schiri.region}</div>}
-    </div>
-  );
-}
-
-// ─── Schiedsrichter Börsenkarte (für Schiri-Ansicht) ──────────────────────────
+// ─── Schiri-Börsenkarte ────────────────────────────────────────────────────────
 
 function SchiriBörsenKarte({ game, userLocation, onBewerben }) {
   const dist = userLocation && game.lat && game.lng ? haversine(userLocation.lat, userLocation.lng, game.lat, game.lng) : null;
   const mannschaft = game.mannschaft || game.jugend || "";
   const kat = getKategorie(mannschaft);
   const c = kategorieColor(kat);
-
   return (
     <div style={{ background: "white", border: "1.5px solid #F5D87A", borderRadius: 12, padding: "1rem 1.25rem", marginBottom: 10, boxShadow: "0 1px 4px rgba(245,216,122,0.2)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
@@ -308,7 +281,7 @@ function SchiriBörsenKarte({ game, userLocation, onBewerben }) {
           <span style={{ fontSize: 12, color: "#777", fontWeight: 500 }}>{formatDate(game.datum)}</span>
         </div>
       </div>
-      <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", marginBottom: 2 }}>{game.verein}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, marginBottom: 2 }}>{game.verein}</div>
       <div style={{ fontSize: 13, color: "#555", marginBottom: 8 }}>{mannschaft}</div>
       <div style={{ height: 1, background: "#f0f0f0", marginBottom: 8 }} />
       <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
@@ -317,14 +290,12 @@ function SchiriBörsenKarte({ game, userLocation, onBewerben }) {
         {game.platz && <span style={{ fontSize: 12, color: "#666" }}>📍 {game.platz}</span>}
         {game.spieldauer && <span style={{ fontSize: 12, color: "#666" }}>⏱️ {game.spieldauer} min</span>}
       </div>
-      {game.schiri_status !== "besetzt" && (
-        <button onClick={() => onBewerben(game)}
-          style={{ width: "100%", padding: "10px", background: "#7A5C00", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+      {game.schiri_status !== "besetzt" ? (
+        <button onClick={() => onBewerben(game)} style={{ width: "100%", padding: 10, background: "#7A5C00", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
           🟡 Als Schiedsrichter bewerben
         </button>
-      )}
-      {game.schiri_status === "besetzt" && (
-        <div style={{ textAlign: "center", padding: "8px", background: "#EAF3DE", borderRadius: 8, fontSize: 13, color: "#27500A", fontWeight: 500 }}>✓ Schiedsrichter bereits bestätigt</div>
+      ) : (
+        <div style={{ textAlign: "center", padding: 8, background: "#EAF3DE", borderRadius: 8, fontSize: 13, color: "#27500A", fontWeight: 500 }}>✓ Schiedsrichter bereits bestätigt</div>
       )}
     </div>
   );
@@ -332,7 +303,7 @@ function SchiriBörsenKarte({ game, userLocation, onBewerben }) {
 
 // ─── Schiri-Bewerbungs-Modal ───────────────────────────────────────────────────
 
-function SchiriBewerbungModal({ game, session, onClose, onConfirm }) {
+function SchiriBewerbungModal({ game, onClose, onConfirm }) {
   const [form, setForm] = useState({ name: "", telefon: "", lizenz: SCHIRI_LIZENZEN[0], nachricht: "" });
   const [loading, setLoading] = useState(false);
 
@@ -372,13 +343,12 @@ function SchiriBewerbungModal({ game, session, onClose, onConfirm }) {
           </div>
         ))}
         <div style={{ marginBottom: 14 }}>
-          <label style={lbl}>Deine Schiedsrichter-Lizenz</label>
+          <label style={lbl}>Lizenz</label>
           <select value={form.lizenz} onChange={(e) => setForm({ ...form, lizenz: e.target.value })} style={inp}>
             {SCHIRI_LIZENZEN.map((l) => <option key={l}>{l}</option>)}
           </select>
         </div>
-        <button onClick={handleSubmit} disabled={loading}
-          style={{ width: "100%", padding: 13, background: "#7A5C00", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", opacity: loading ? 0.7 : 1 }}>
+        <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: 13, background: "#7A5C00", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", opacity: loading ? 0.7 : 1 }}>
           {loading ? "Wird gesendet..." : "Bewerbung absenden"}
         </button>
         <button onClick={onClose} style={{ width: "100%", padding: 10, background: "transparent", border: "none", color: "#888", cursor: "pointer", fontSize: 13, marginTop: 6 }}>Abbrechen</button>
@@ -410,32 +380,33 @@ function SchiriAnfragenModal({ game, onClose, onBestaetigen }) {
   }
 
   return (
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 101, padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: "white", borderRadius: 16, padding: "1.5rem", maxWidth: 480, width: "100%", maxHeight: "85vh", overflowY: "auto", border: "1px solid #e0e0e0", boxShadow: "0 8px 32px rgba(0,0,0,0.15)" }}>
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 102, padding: 16 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "white", borderRadius: 16, padding: "1.5rem", maxWidth: 480, width: "100%", maxHeight: "85vh", overflowY: "auto", border: "1px solid #e0e0e0", boxShadow: "0 8px 32px rgba(0,0,0,0.15)", position: "relative" }}>
         <button onClick={onClose} style={{ position: "absolute", top: 12, right: 12, width: 28, height: 28, borderRadius: "50%", border: "1px solid #e0e0e0", background: "#f5f5f5", cursor: "pointer", fontSize: 13 }}>✕</button>
         <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>🟡 Schiedsrichter-Bewerbungen</div>
         <div style={{ fontSize: 13, color: "#777", marginBottom: 16 }}>{game.verein} · {formatDate(game.datum)}</div>
-        {laden ? <Ladeindikator /> : anfragen.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "2rem", color: "#aaa" }}>Noch keine Bewerbungen eingegangen.</div>
-        ) : anfragen.map((a) => (
-          <div key={a.id} style={{ background: "#f8f8f8", border: `1.5px solid ${a.status === "bestaetigt" ? "#B8DCA0" : a.status === "abgelehnt" ? "#F09595" : "#e0e0e0"}`, borderRadius: 10, padding: "1rem", marginBottom: 10 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>{a.schiri_name}</div>
-              {a.status === "bestaetigt" && <Badge variant="green">✓ Bestätigt</Badge>}
-              {a.status === "abgelehnt" && <Badge variant="red">✗ Abgelehnt</Badge>}
-              {a.status === "offen" && <Badge variant="yellow">Offen</Badge>}
-            </div>
-            <div style={{ fontSize: 13, color: "#185FA5", marginBottom: 4 }}>{a.schiri_tel}</div>
-            {a.schiri_lizenz && <div style={{ fontSize: 12, color: "#555", marginBottom: 4 }}>🟡 {a.schiri_lizenz}</div>}
-            {a.nachricht && <div style={{ fontSize: 12, color: "#666", background: "white", padding: "6px 10px", borderRadius: 6, marginBottom: 8, border: "1px solid #e5e5e5" }}>"{a.nachricht}"</div>}
-            {a.status === "offen" && (
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                <button onClick={() => ablehnen(a)} style={{ padding: "8px", background: "white", color: "#791F1F", border: "1.5px solid #F09595", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Ablehnen</button>
-                <button onClick={() => bestaetigen(a)} style={{ padding: "8px", background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>✓ Bestätigen</button>
+        {laden ? <Ladeindikator /> : anfragen.length === 0
+          ? <div style={{ textAlign: "center", padding: "2rem", color: "#aaa" }}>Noch keine Bewerbungen.</div>
+          : anfragen.map((a) => (
+            <div key={a.id} style={{ background: "#f8f8f8", border: `1.5px solid ${a.status === "bestaetigt" ? "#B8DCA0" : a.status === "abgelehnt" ? "#F09595" : "#e0e0e0"}`, borderRadius: 10, padding: "1rem", marginBottom: 10 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <div style={{ fontSize: 15, fontWeight: 700 }}>{a.schiri_name}</div>
+                {a.status === "bestaetigt" && <Badge variant="green">✓ Bestätigt</Badge>}
+                {a.status === "abgelehnt" && <Badge variant="red">✗ Abgelehnt</Badge>}
+                {a.status === "offen" && <Badge variant="yellow">Offen</Badge>}
               </div>
-            )}
-          </div>
-        ))}
+              <div style={{ fontSize: 13, color: "#185FA5", marginBottom: 4 }}>{a.schiri_tel}</div>
+              {a.schiri_lizenz && <div style={{ fontSize: 12, color: "#555", marginBottom: 4 }}>🟡 {a.schiri_lizenz}</div>}
+              {a.nachricht && <div style={{ fontSize: 12, color: "#666", background: "white", padding: "6px 10px", borderRadius: 6, marginBottom: 8, border: "1px solid #e5e5e5" }}>"{a.nachricht}"</div>}
+              {a.status === "offen" && (
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  <button onClick={() => ablehnen(a)} style={{ padding: 8, background: "white", color: "#791F1F", border: "1.5px solid #F09595", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Ablehnen</button>
+                  <button onClick={() => bestaetigen(a)} style={{ padding: 8, background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: "pointer" }}>✓ Bestätigen</button>
+                </div>
+              )}
+            </div>
+          ))
+        }
       </div>
     </div>
   );
@@ -443,14 +414,15 @@ function SchiriAnfragenModal({ game, onClose, onBestaetigen }) {
 
 // ─── Detail-Modal ──────────────────────────────────────────────────────────────
 
-function DetailModal({ game, userLocation, session, onClose, onBook, onSchiriAnfragen, onRefresh }) {
+function DetailModal({ game, userLocation, session, onClose, onBook, onRefresh }) {
+  const [showSchiriAnfragen, setShowSchiriAnfragen] = useState(false);
   if (!game) return null;
   const dist = userLocation && game.lat && game.lng ? haversine(userLocation.lat, userLocation.lng, game.lat, game.lng) : null;
   const mannschaft = game.mannschaft || game.jugend || "";
   const kat = getKategorie(mannschaft);
   const c = kategorieColor(kat);
   const mapsUrl = game.adresse ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.adresse)}` : null;
-  const [showSchiriAnfragen, setShowSchiriAnfragen] = useState(false);
+  const istSchiri = session?.user?.user_metadata?.rolle === "schiedsrichter";
 
   return (
     <>
@@ -496,7 +468,6 @@ function DetailModal({ game, userLocation, session, onClose, onBook, onSchiriAnf
             </div>
           </div>
 
-          {/* Schiedsrichter-Status */}
           {game.schiri_benoetigt && (
             <div style={{ background: "#FFFBE6", border: "1.5px solid #F5D87A", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: "#7A5C00", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>🟡 Schiedsrichter</div>
@@ -517,10 +488,8 @@ function DetailModal({ game, userLocation, session, onClose, onBook, onSchiriAnf
 
           {mapsUrl && <a href={mapsUrl} target="_blank" rel="noreferrer" style={{ display: "block", width: "100%", padding: 11, background: "#378ADD", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, marginBottom: 8, textAlign: "center", textDecoration: "none" }}>🗺️ Navigation starten</a>}
 
-          {/* Schiri-Bewerbungen anzeigen (nur für Trainer) */}
-          {game.schiri_benoetigt && game.schiri_status === "angefragt" && session?.user?.user_metadata?.rolle !== "schiedsrichter" && (
-            <button onClick={() => setShowSchiriAnfragen(true)}
-              style={{ width: "100%", padding: 11, background: "#FFFBE6", color: "#7A5C00", border: "1.5px solid #F5D87A", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 8 }}>
+          {game.schiri_benoetigt && game.schiri_status === "angefragt" && !istSchiri && (
+            <button onClick={() => setShowSchiriAnfragen(true)} style={{ width: "100%", padding: 11, background: "#FFFBE6", color: "#7A5C00", border: "1.5px solid #F5D87A", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 8 }}>
               🟡 Schiedsrichter-Bewerbungen ansehen
             </button>
           )}
@@ -536,11 +505,7 @@ function DetailModal({ game, userLocation, session, onClose, onBook, onSchiriAnf
       </div>
 
       {showSchiriAnfragen && (
-        <SchiriAnfragenModal
-          game={game}
-          onClose={() => setShowSchiriAnfragen(false)}
-          onBestaetigen={() => { setShowSchiriAnfragen(false); onRefresh(); onClose(); }}
-        />
+        <SchiriAnfragenModal game={game} onClose={() => setShowSchiriAnfragen(false)} onBestaetigen={() => { setShowSchiriAnfragen(false); onRefresh(); onClose(); }} />
       )}
     </>
   );
@@ -548,13 +513,15 @@ function DetailModal({ game, userLocation, session, onClose, onBook, onSchiriAnf
 
 // ─── Buchungs-Modal ────────────────────────────────────────────────────────────
 
-function BookingModal({ game, onClose, onConfirm }) {
+function BookingModal({ game, session, onClose, onConfirm }) {
   const [form, setForm] = useState({ name: "", verein: "", tel: "", mannschaft: "E-Jugend (U10)", msg: "" });
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit() {
     if (!form.name || !form.verein || !form.tel) { alert("Bitte Name, Verein und Telefonnummer ausfüllen."); return; }
-    setLoading(true); await onConfirm(form); setLoading(false);
+    setLoading(true);
+    await onConfirm(form);
+    setLoading(false);
   }
 
   return (
@@ -562,6 +529,11 @@ function BookingModal({ game, onClose, onConfirm }) {
       <div onClick={(e) => e.stopPropagation()} style={{ background: "white", borderRadius: 16, padding: "1.5rem", maxWidth: 440, width: "100%", maxHeight: "85vh", overflowY: "auto", border: "1px solid #e0e0e0", boxShadow: "0 8px 32px rgba(0,0,0,0.15)" }}>
         <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>Buchung abschließen</div>
         <div style={{ fontSize: 13, color: "#777", marginBottom: 16 }}>{game.verein} · {formatDate(game.datum)} · {game.uhrzeit} Uhr</div>
+
+        <div style={{ background: "#E6F1FB", border: "1px solid #B5D4F4", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#0C447C" }}>
+          📧 Nach der Buchung erhalten beide Trainer eine Bestätigungs-E-Mail mit den gegenseitigen Kontaktdaten.
+        </div>
+
         {[
           { label: "Dein Name", key: "name", type: "text", placeholder: "Vor- und Nachname" },
           { label: "Dein Verein", key: "verein", type: "text", placeholder: "z.B. FC Musterstadt" },
@@ -573,10 +545,12 @@ function BookingModal({ game, onClose, onConfirm }) {
             <input type={f.type} placeholder={f.placeholder} value={form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} style={inp} />
           </div>
         ))}
+
         <div style={{ marginBottom: 14 }}>
           <label style={{ ...lbl, marginBottom: 8 }}>Deine Mannschaft</label>
           <MannschaftAuswahl value={form.mannschaft} onChange={(v) => setForm({ ...form, mannschaft: v })} />
         </div>
+
         <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: 13, background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", opacity: loading ? 0.7 : 1 }}>
           {loading ? "Wird gespeichert..." : "Buchung bestätigen"}
         </button>
@@ -649,7 +623,6 @@ function EintragenTab({ onSubmit }) {
 
   return (
     <div>
-      {/* Typ */}
       <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
         {[
           { val: "angebot", label: "⚽ Spiel anbieten", bg: "#E1F5EE", txt: "#085041", bd: "#A8DFC4" },
@@ -662,10 +635,8 @@ function EintragenTab({ onSubmit }) {
         ))}
       </div>
 
-      {/* Mannschaft */}
       <div style={sec}><SectionLabel>Mannschaft</SectionLabel><MannschaftAuswahl value={mannschaft} onChange={setMannschaft} /></div>
 
-      {/* Spieldaten */}
       <div style={sec}>
         <SectionLabel>Spieldaten</SectionLabel>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
@@ -691,7 +662,6 @@ function EintragenTab({ onSubmit }) {
         </div>
       </div>
 
-      {/* Schiedsrichter benötigt */}
       <div style={sec}>
         <SectionLabel>Schiedsrichter</SectionLabel>
         <label style={{ display: "flex", gap: 12, alignItems: "center", cursor: "pointer" }}>
@@ -711,7 +681,6 @@ function EintragenTab({ onSubmit }) {
         )}
       </div>
 
-      {/* Optionale Felder */}
       <div style={sec}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
           <SectionLabel>Weitere Angaben</SectionLabel>
@@ -804,32 +773,16 @@ function SchiriBörseTab({ games, userLocation, session, onRefresh }) {
     <div>
       <div style={{ background: "#FFFBE6", border: "1.5px solid #F5D87A", borderRadius: 12, padding: "12px 16px", marginBottom: 14, fontSize: 13, color: "#7A5C00" }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>🟡 Schiedsrichter-Börse</div>
-        <div>Hier findest du alle Spiele die einen Schiedsrichter suchen. Bewirb dich direkt mit einem Klick.</div>
+        <div>Hier findest du alle Spiele die einen Schiedsrichter suchen.</div>
       </div>
-
       {toast && <div style={{ background: "#1D9E75", color: "white", padding: "10px 16px", borderRadius: 8, marginBottom: 12, fontSize: 13, fontWeight: 500 }}>✓ {toast}</div>}
-
       <SortierBar sortBy={sortBy} onChange={setSortBy} userLocation={userLocation} />
-
       {offeneSpiele.length === 0
         ? <div style={{ textAlign: "center", padding: "3rem 1rem", color: "#aaa" }}>Aktuell keine Spiele mit Schiedsrichter-Bedarf.</div>
-        : offeneSpiele.map((g) => (
-          <SchiriBörsenKarte key={g.id} game={g} userLocation={userLocation}
-            onBewerben={(game) => setBewerbungGame(game)} />
-        ))
+        : offeneSpiele.map((g) => <SchiriBörsenKarte key={g.id} game={g} userLocation={userLocation} onBewerben={setBewerbungGame} />)
       }
-
       {bewerbungGame && (
-        <SchiriBewerbungModal
-          game={bewerbungGame}
-          session={session}
-          onClose={() => setBewerbungGame(null)}
-          onConfirm={() => {
-            setBewerbungGame(null);
-            showToast("Bewerbung erfolgreich gesendet!");
-            onRefresh();
-          }}
-        />
+        <SchiriBewerbungModal game={bewerbungGame} onClose={() => setBewerbungGame(null)} onConfirm={() => { setBewerbungGame(null); showToast("Bewerbung erfolgreich gesendet!"); onRefresh(); }} />
       )}
     </div>
   );
@@ -864,11 +817,9 @@ function SucheTab({ games, userLocation, onSelectGame }) {
     setResults(sortiereSpiele(res, sortBy, loc));
   }
 
-  const sel = inp;
-
   return (
     <div>
-      {!userLocation && <div style={{ background: "#FAEEDA", border: "1.5px solid #F0C98A", borderRadius: 10, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#633806", fontWeight: 500 }}>⚠️ Kein Standort gesetzt — bitte oben rechts Standort eingeben.</div>}
+      {!userLocation && <div style={{ background: "#FAEEDA", border: "1.5px solid #F0C98A", borderRadius: 10, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#633806", fontWeight: 500 }}>⚠️ Kein Standort gesetzt.</div>}
 
       <div style={sec}>
         <SectionLabel>Mannschaft</SectionLabel>
@@ -898,12 +849,12 @@ function SucheTab({ games, userLocation, onSelectGame }) {
       <div style={sec}>
         <SectionLabel>Weitere Filter</SectionLabel>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-          <div><label style={lbl}>Typ</label><select style={sel} value={typ} onChange={(e) => setTyp(e.target.value)}><option value="">Alle</option><option value="angebot">Angebot</option><option value="anfrage">Anfrage</option></select></div>
-          <div><label style={lbl}>Spielstärke</label><select style={sel} value={staerke} onChange={(e) => setStaerke(e.target.value)}><option value="">Egal</option>{[1,2,3,4,5].map((n) => <option key={n}>{n}</option>)}</select></div>
+          <div><label style={lbl}>Typ</label><select style={inp} value={typ} onChange={(e) => setTyp(e.target.value)}><option value="">Alle</option><option value="angebot">Angebot</option><option value="anfrage">Anfrage</option></select></div>
+          <div><label style={lbl}>Spielstärke</label><select style={inp} value={staerke} onChange={(e) => setStaerke(e.target.value)}><option value="">Egal</option>{[1,2,3,4,5].map((n) => <option key={n}>{n}</option>)}</select></div>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-          <div><label style={lbl}>Datum ab</label><input type="date" style={sel} value={datum} onChange={(e) => setDatum(e.target.value)} /></div>
-          <div><label style={lbl}>Rasen</label><select style={sel} value={rasen} onChange={(e) => setRasen(e.target.value)}><option value="">Egal</option>{["Naturrasen","Kunstrasen","Hartplatz","Halle"].map((r) => <option key={r}>{r}</option>)}</select></div>
+          <div><label style={lbl}>Datum ab</label><input type="date" style={inp} value={datum} onChange={(e) => setDatum(e.target.value)} /></div>
+          <div><label style={lbl}>Rasen</label><select style={inp} value={rasen} onChange={(e) => setRasen(e.target.value)}><option value="">Egal</option>{["Naturrasen","Kunstrasen","Hartplatz","Halle"].map((r) => <option key={r}>{r}</option>)}</select></div>
         </div>
         <div style={{ marginBottom: 14 }}>
           <label style={lbl}>Umkreis: <strong>{km} km</strong>{userLocation ? ` ab ${userLocation.label}` : ""}</label>
@@ -945,7 +896,6 @@ export default function App() {
   const [laden, setLaden] = useState(false);
   const [selectedGame, setSelectedGame] = useState(null);
   const [bookingGame, setBookingGame] = useState(null);
-  const [schiriBewerbungGame, setSchiriBewerbungGame] = useState(null);
   const [toast, setToast] = useState("");
   const [userLocation, setUserLocation] = useState(null);
   const [showStandortModal, setShowStandortModal] = useState(false);
@@ -953,7 +903,6 @@ export default function App() {
   const rolle = session?.user?.user_metadata?.rolle || "trainer";
   const istSchiri = rolle === "schiedsrichter";
 
-  // Tabs je nach Rolle
   const TABS = istSchiri
     ? [
         { id: "liste",  label: "Spiele" },
@@ -985,7 +934,7 @@ export default function App() {
 
   if (!session) return <Login />;
 
-  function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 2500); }
+  function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 3000); }
 
   async function handleAddGame(formData) {
     const { data, error } = await supabase.from("games").insert([{
@@ -994,8 +943,7 @@ export default function App() {
       trainer_name: formData.trainer_name, telefon: formData.telefon, verein: formData.verein, status: "offen",
       umkreis_km: formData.umkreis_km || null, spielfeld_groesse: formData.spielfeld_groesse || null,
       spieldauer: formData.spieldauer ? parseInt(formData.spieldauer) : null, wichtige_infos: formData.wichtige_infos || null,
-      schiri_benoetigt: formData.schiri_benoetigt || false,
-      schiri_status: formData.schiri_status || null,
+      schiri_benoetigt: formData.schiri_benoetigt || false, schiri_status: formData.schiri_status || null,
       lat: null, lng: null,
     }]).select();
     if (error) { alert("Fehler: " + error.message); return; }
@@ -1005,11 +953,52 @@ export default function App() {
   }
 
   async function handleConfirmBooking(bookingData) {
-    const { error } = await supabase.from("games").update({ status: "gebucht" }).eq("id", bookingGame.id);
-    if (error) { alert("Fehler: " + error.message); return; }
+    // 1. Spiel-Status auf "gebucht" setzen
+    const { error: updateError } = await supabase
+      .from("games")
+      .update({ status: "gebucht" })
+      .eq("id", bookingGame.id);
+
+    if (updateError) { alert("Fehler beim Buchen: " + updateError.message); return; }
+
+    // 2. Buchung dauerhaft in Supabase speichern
+    const buchungsDaten = {
+      game_id: bookingGame.id,
+      anbieter_name: bookingGame.trainer_name,
+      anbieter_tel: bookingGame.telefon,
+      anbieter_verein: bookingGame.verein,
+      anbieter_email: session.user.email,
+      bucher_name: bookingData.name,
+      bucher_verein: bookingData.verein,
+      bucher_tel: bookingData.tel,
+      bucher_mannschaft: bookingData.mannschaft || null,
+      bucher_nachricht: bookingData.msg || null,
+      bucher_email: session.user.email,
+      datum: formatDate(bookingGame.datum),
+      uhrzeit: bookingGame.uhrzeit,
+    };
+
+    const { error: buchungError } = await supabase
+      .from("buchungen")
+      .insert([buchungsDaten]);
+
+    if (buchungError) {
+      console.error("Buchung konnte nicht gespeichert werden:", buchungError.message);
+    }
+
+    // 3. E-Mail-Benachrichtigung über Edge Function senden
+    try {
+      await supabase.functions.invoke("buchung-bestaetigung", {
+        body: buchungsDaten,
+      });
+    } catch (err) {
+      console.error("E-Mail konnte nicht gesendet werden:", err);
+    }
+
+    // 4. Lokalen State aktualisieren
     setGames((prev) => prev.map((g) => g.id === bookingGame.id ? { ...g, status: "gebucht" } : g));
     setBookingGame(null);
-    showToast("Spiel gebucht!");
+    showToast("Spiel gebucht! Bestätigungs-E-Mail wurde versendet.");
     setActiveTab("meine");
   }
 
@@ -1064,12 +1053,23 @@ export default function App() {
           session={session}
           onClose={() => setSelectedGame(null)}
           onBook={(g) => { setSelectedGame(null); setBookingGame(g); }}
-          onSchiriAnfragen={(g) => { setSelectedGame(null); setSchiriBewerbungGame(g); }}
           onRefresh={ladeSpiele}
         />
       )}
-      {bookingGame && <BookingModal game={bookingGame} onClose={() => setBookingGame(null)} onConfirm={handleConfirmBooking} />}
-      {showStandortModal && <StandortModal onClose={() => setShowStandortModal(false)} onSave={(loc) => { setUserLocation(loc); setShowStandortModal(false); showToast(`Standort: ${loc.label}`); }} />}
+      {bookingGame && (
+        <BookingModal
+          game={bookingGame}
+          session={session}
+          onClose={() => setBookingGame(null)}
+          onConfirm={handleConfirmBooking}
+        />
+      )}
+      {showStandortModal && (
+        <StandortModal
+          onClose={() => setShowStandortModal(false)}
+          onSave={(loc) => { setUserLocation(loc); setShowStandortModal(false); showToast(`Standort: ${loc.label}`); }}
+        />
+      )}
     </div>
   );
 }
