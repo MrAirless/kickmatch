@@ -2,6 +2,17 @@ import { useState, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 import Login from "./Login";
 
+// ─── Mannschafts-Optionen ──────────────────────────────────────────────────────
+
+const MANNSCHAFTEN = {
+  "Junioren": ["E-Jugend (U10)", "D-Jugend (U12)", "C-Jugend (U14)", "B-Jugend (U17)", "A-Jugend (U19)"],
+  "Juniorinnen": ["E-Juniorinnen (U10)", "D-Juniorinnen (U12)", "C-Juniorinnen (U14)", "B-Juniorinnen (U17)", "A-Juniorinnen (U19)"],
+  "Herren": ["Herren 1. Mannschaft", "Herren 2. Mannschaft", "Herren 3. Mannschaft", "Herren Ü32", "Herren Ü40", "Herren Ü50"],
+  "Damen": ["Damen 1. Mannschaft", "Damen 2. Mannschaft", "Damen Ü32"],
+};
+
+const ALLE_MANNSCHAFTEN = Object.values(MANNSCHAFTEN).flat();
+
 // ─── Hilfsfunktionen ───────────────────────────────────────────────────────────
 
 function formatDate(d) {
@@ -20,6 +31,23 @@ function haversine(lat1, lon1, lat2, lon2) {
       Math.cos((lat2 * Math.PI) / 180) *
       Math.sin(dLon / 2) ** 2;
   return Math.round(R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
+}
+
+function getKategorie(mannschaft) {
+  for (const [kat, liste] of Object.entries(MANNSCHAFTEN)) {
+    if (liste.includes(mannschaft)) return kat;
+  }
+  return "";
+}
+
+function kategorieColor(kat) {
+  const colors = {
+    "Junioren":    { background: "#E6F1FB", color: "#0C447C" },
+    "Juniorinnen": { background: "#FAEEDA", color: "#633806" },
+    "Herren":      { background: "#EAF3DE", color: "#27500A" },
+    "Damen":       { background: "#EEEDFE", color: "#3C3489" },
+  };
+  return colors[kat] || { background: "#F1EFE8", color: "#444441" };
 }
 
 // ─── Standort-Modal ────────────────────────────────────────────────────────────
@@ -97,6 +125,46 @@ function StandortModal({ onClose, onSave }) {
   );
 }
 
+// ─── Mannschafts-Auswahl Komponente ───────────────────────────────────────────
+
+function MannschaftAuswahl({ value, onChange }) {
+  const [aktiveKat, setAktiveKat] = useState(() => {
+    if (!value) return "Junioren";
+    return getKategorie(value) || "Junioren";
+  });
+
+  return (
+    <div>
+      {/* Kategorie-Tabs */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 10, background: "#f5f5f5", borderRadius: 10, padding: 4 }}>
+        {Object.keys(MANNSCHAFTEN).map((kat) => {
+          const c = kategorieColor(kat);
+          const aktiv = aktiveKat === kat;
+          return (
+            <button key={kat} onClick={() => { setAktiveKat(kat); onChange(MANNSCHAFTEN[kat][0]); }}
+              style={{ flex: 1, padding: "7px 4px", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12, fontWeight: 500, transition: "all .15s", background: aktiv ? c.background : "transparent", color: aktiv ? c.color : "#888" }}>
+              {kat}
+            </button>
+          );
+        })}
+      </div>
+      {/* Mannschafts-Liste */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        {MANNSCHAFTEN[aktiveKat].map((m) => {
+          const aktiv = value === m;
+          const c = kategorieColor(aktiveKat);
+          return (
+            <button key={m} onClick={() => onChange(m)}
+              style={{ padding: "9px 14px", border: `0.5px solid ${aktiv ? c.color : "#e5e5e5"}`, borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: aktiv ? 500 : 400, textAlign: "left", background: aktiv ? c.background : "white", color: aktiv ? c.color : "#444" }}>
+              {aktiv ? "✓ " : ""}{m}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ─── Kleine Hilfskomponenten ───────────────────────────────────────────────────
 
 function StrengthDots({ value }) {
@@ -109,7 +177,7 @@ function StrengthDots({ value }) {
   );
 }
 
-function Badge({ children, color }) {
+function Badge({ children, color, style: extraStyle }) {
   const styles = {
     offer:  { background: "#E1F5EE", color: "#085041" },
     search: { background: "#EEEDFE", color: "#3C3489" },
@@ -119,7 +187,7 @@ function Badge({ children, color }) {
     orange: { background: "#FAEEDA", color: "#633806" },
   };
   const s = styles[color] || styles.gray;
-  return <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, ...s }}>{children}</span>;
+  return <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, ...s, ...extraStyle }}>{children}</span>;
 }
 
 function Toast({ message }) {
@@ -137,17 +205,18 @@ function GameCard({ game, userLocation, onClick }) {
   const dist = userLocation && game.lat && game.lng
     ? haversine(userLocation.lat, userLocation.lng, game.lat, game.lng)
     : null;
+  const mannschaft = game.mannschaft || game.jugend || "";
+  const kat = getKategorie(mannschaft);
+  const katColor = kategorieColor(kat);
+
   return (
     <div onClick={() => onClick(game)} style={{ background: "white", border: "0.5px solid #e5e5e5", borderRadius: 12, padding: "1rem 1.25rem", marginBottom: 10, cursor: "pointer" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
           <Badge color={game.type === "angebot" ? "offer" : "search"}>{game.type === "angebot" ? "Angebot" : "Anfrage"}</Badge>
-          <Badge color="blue">{game.jugend.split(" ")[0]}</Badge>
+          {kat && <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, ...katColor }}>{kat}</span>}
           {game.status === "gebucht" && <Badge color="green">Gebucht</Badge>}
-          {/* Umkreis-Badge bei Anfragen */}
-          {game.type === "anfrage" && game.umkreis_km && (
-            <Badge color="orange">📍 max. {game.umkreis_km} km</Badge>
-          )}
+          {game.type === "anfrage" && game.umkreis_km && <Badge color="orange">📍 max. {game.umkreis_km} km</Badge>}
         </div>
         <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
           {dist !== null && <Badge color="gray">{dist} km</Badge>}
@@ -155,6 +224,7 @@ function GameCard({ game, userLocation, onClick }) {
         </div>
       </div>
       <div style={{ fontSize: 15, fontWeight: 500, color: "#1a1a1a" }}>{game.verein}</div>
+      <div style={{ fontSize: 13, color: "#555", marginTop: 3 }}>{mannschaft}</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 6 }}>
         <span style={{ fontSize: 12, color: "#888" }}>🕐 {game.uhrzeit}</span>
         {game.platz && <span style={{ fontSize: 12, color: "#888" }}>· {game.platz}</span>}
@@ -175,6 +245,9 @@ function DetailModal({ game, userLocation, onClose, onBook }) {
   const dist = userLocation && game.lat && game.lng
     ? haversine(userLocation.lat, userLocation.lng, game.lat, game.lng)
     : null;
+  const mannschaft = game.mannschaft || game.jugend || "";
+  const kat = getKategorie(mannschaft);
+  const katColor = kategorieColor(kat);
   const mapsUrl = game.adresse
     ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.adresse)}`
     : null;
@@ -186,12 +259,13 @@ function DetailModal({ game, userLocation, onClose, onBook }) {
 
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 12 }}>
           <Badge color={game.type === "angebot" ? "offer" : "search"}>{game.type === "angebot" ? "Spiel anbieten" : "Spiel anfragen"}</Badge>
-          <Badge color="blue">{game.jugend}</Badge>
+          {kat && <span style={{ display: "inline-block", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 500, ...katColor }}>{kat}</span>}
           {game.status === "gebucht" && <Badge color="green">✓ Gebucht</Badge>}
           {dist !== null && <Badge color="gray">{dist} km entfernt</Badge>}
         </div>
 
-        <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 14 }}>{game.verein}</div>
+        <div style={{ fontSize: 18, fontWeight: 500, marginBottom: 4 }}>{game.verein}</div>
+        <div style={{ fontSize: 14, color: "#555", marginBottom: 14 }}>{mannschaft}</div>
 
         {[
           { icon: "📅", label: "Datum & Uhrzeit", value: `${formatDate(game.datum)} um ${game.uhrzeit} Uhr` },
@@ -220,7 +294,6 @@ function DetailModal({ game, userLocation, onClose, onBook }) {
           </div>
         </div>
 
-        {/* Umkreis bei Anfragen anzeigen */}
         {game.type === "anfrage" && game.umkreis_km && (
           <div style={{ display: "flex", gap: 12, padding: "9px 0", borderBottom: "0.5px solid #f0f0f0" }}>
             <div style={{ fontSize: 15, width: 20, flexShrink: 0 }}>🗺️</div>
@@ -252,7 +325,7 @@ function DetailModal({ game, userLocation, onClose, onBook }) {
 // ─── Buchungs-Modal ────────────────────────────────────────────────────────────
 
 function BookingModal({ game, onClose, onConfirm }) {
-  const [form, setForm] = useState({ name: "", verein: "", tel: "", jugend: "E-Jugend (U10)", msg: "" });
+  const [form, setForm] = useState({ name: "", verein: "", tel: "", mannschaft: "E-Jugend (U10)", msg: "" });
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit() {
@@ -289,12 +362,10 @@ function BookingModal({ game, onClose, onConfirm }) {
           </div>
         ))}
         <div style={{ marginBottom: 10 }}>
-          <label style={{ display: "block", fontSize: 12, color: "#666", fontWeight: 500, marginBottom: 5 }}>Jahrgang deiner Mannschaft</label>
-          <select value={form.jugend} onChange={(e) => setForm({ ...form, jugend: e.target.value })} style={{ width: "100%", padding: "8px 10px", border: "0.5px solid #ccc", borderRadius: 8, fontSize: 14 }}>
-            {["E-Jugend (U10)", "D-Jugend (U12)", "C-Jugend (U14)", "B-Jugend (U17)", "A-Jugend (U19)"].map((j) => <option key={j}>{j}</option>)}
-          </select>
+          <label style={{ display: "block", fontSize: 12, color: "#666", fontWeight: 500, marginBottom: 8 }}>Deine Mannschaft</label>
+          <MannschaftAuswahl value={form.mannschaft} onChange={(v) => setForm({ ...form, mannschaft: v })} />
         </div>
-        <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: 12, background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: "pointer", marginTop: 6, opacity: loading ? 0.7 : 1 }}>
+        <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: 12, background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 500, cursor: "pointer", marginTop: 12, opacity: loading ? 0.7 : 1 }}>
           {loading ? "Wird gespeichert..." : "Buchung bestätigen"}
         </button>
         <button onClick={onClose} style={{ width: "100%", padding: 10, background: "transparent", border: "none", color: "#888", cursor: "pointer", fontSize: 13, marginTop: 8 }}>Abbrechen</button>
@@ -305,20 +376,23 @@ function BookingModal({ game, onClose, onConfirm }) {
 
 // ─── Tab: Spielliste ───────────────────────────────────────────────────────────
 
-const FILTERS = ["Alle", "Angebote", "Anfragen", "E-Jugend", "D-Jugend", "C-Jugend"];
+const FILTER_KATEGORIEN = ["Alle", "Angebote", "Anfragen", "Junioren", "Juniorinnen", "Herren", "Damen"];
 
 function ListeTab({ games, userLocation, laden, onSelectGame }) {
   const [activeFilter, setActiveFilter] = useState("Alle");
+
   const filtered = games.filter((g) => {
+    const mannschaft = g.mannschaft || g.jugend || "";
     if (activeFilter === "Alle") return true;
     if (activeFilter === "Angebote") return g.type === "angebot";
     if (activeFilter === "Anfragen") return g.type === "anfrage";
-    return g.jugend.includes(activeFilter);
+    return getKategorie(mannschaft) === activeFilter;
   });
+
   return (
     <div>
       <div style={{ display: "flex", gap: 6, marginBottom: 14, overflowX: "auto", paddingBottom: 4 }}>
-        {FILTERS.map((f) => (
+        {FILTER_KATEGORIEN.map((f) => (
           <button key={f} onClick={() => setActiveFilter(f)}
             style={{ padding: "6px 13px", borderRadius: 20, border: "0.5px solid", borderColor: activeFilter === f ? "#185FA5" : "#ccc", background: activeFilter === f ? "#185FA5" : "white", color: activeFilter === f ? "white" : "#666", fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>
             {f}
@@ -337,11 +411,12 @@ function ListeTab({ games, userLocation, laden, onSelectGame }) {
 
 function EintragenTab({ onSubmit }) {
   const [type, setType] = useState("angebot");
+  const [mannschaft, setMannschaft] = useState("E-Jugend (U10)");
   const [staerke, setStaerke] = useState(3);
   const [umkreis, setUmkreis] = useState(30);
   const [laden, setLaden] = useState(false);
   const [form, setForm] = useState({
-    datum: "", uhrzeit: "10:00", jugend: "E-Jugend (U10)", rasen: "Naturrasen",
+    datum: "", uhrzeit: "10:00", rasen: "Naturrasen",
     platz: "", adresse: "", trainer_name: "", telefon: "", verein: "",
   });
 
@@ -353,9 +428,10 @@ function EintragenTab({ onSubmit }) {
       return;
     }
     setLaden(true);
-    await onSubmit({ ...form, type, staerke, umkreis_km: type === "anfrage" ? umkreis : null });
-    setForm({ datum: "", uhrzeit: "10:00", jugend: "E-Jugend (U10)", rasen: "Naturrasen", platz: "", adresse: "", trainer_name: "", telefon: "", verein: "" });
+    await onSubmit({ ...form, type, mannschaft, staerke, umkreis_km: type === "anfrage" ? umkreis : null });
+    setForm({ datum: "", uhrzeit: "10:00", rasen: "Naturrasen", platz: "", adresse: "", trainer_name: "", telefon: "", verein: "" });
     setType("angebot");
+    setMannschaft("E-Jugend (U10)");
     setStaerke(3);
     setUmkreis(30);
     setLaden(false);
@@ -379,25 +455,23 @@ function EintragenTab({ onSubmit }) {
         ))}
       </div>
 
+      {/* Mannschafts-Auswahl */}
+      <div style={sectionStyle}>
+        <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Mannschaft</div>
+        <MannschaftAuswahl value={mannschaft} onChange={setMannschaft} />
+      </div>
+
       <div style={sectionStyle}>
         <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Spieldaten</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
           <div><label style={labelStyle}>Datum</label><input type="date" style={inputStyle} value={form.datum} onChange={(e) => set("datum", e.target.value)} /></div>
           <div><label style={labelStyle}>Uhrzeit</label><input type="time" style={inputStyle} value={form.uhrzeit} onChange={(e) => set("uhrzeit", e.target.value)} /></div>
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
-          <div>
-            <label style={labelStyle}>Jahrgang</label>
-            <select style={inputStyle} value={form.jugend} onChange={(e) => set("jugend", e.target.value)}>
-              {["E-Jugend (U10)", "D-Jugend (U12)", "C-Jugend (U14)", "B-Jugend (U17)", "A-Jugend (U19)"].map((j) => <option key={j}>{j}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={labelStyle}>Rasenart</label>
-            <select style={inputStyle} value={form.rasen} onChange={(e) => set("rasen", e.target.value)}>
-              {["Naturrasen", "Kunstrasen", "Hartplatz", "Halle"].map((r) => <option key={r}>{r}</option>)}
-            </select>
-          </div>
+        <div style={{ marginBottom: 10 }}>
+          <label style={labelStyle}>Rasenart</label>
+          <select style={inputStyle} value={form.rasen} onChange={(e) => set("rasen", e.target.value)}>
+            {["Naturrasen", "Kunstrasen", "Hartplatz", "Halle"].map((r) => <option key={r}>{r}</option>)}
+          </select>
         </div>
         <div>
           <label style={labelStyle}>Spielstärke (1 = schwächer, 5 = stärker)</label>
@@ -412,16 +486,11 @@ function EintragenTab({ onSubmit }) {
         </div>
       </div>
 
-      {/* Umkreis-Feld — nur bei Anfragen sichtbar */}
       {type === "anfrage" && (
         <div style={sectionStyle}>
           <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Suchradius</div>
           <label style={labelStyle}>Maximaler Umkreis: {umkreis} km</label>
-          <input
-            type="range" min={5} max={150} step={5} value={umkreis}
-            onChange={(e) => setUmkreis(parseInt(e.target.value))}
-            style={{ width: "100%", marginBottom: 8 }}
-          />
+          <input type="range" min={5} max={150} step={5} value={umkreis} onChange={(e) => setUmkreis(parseInt(e.target.value))} style={{ width: "100%", marginBottom: 8 }} />
           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11, color: "#aaa" }}>
             <span>5 km</span>
             <span style={{ fontWeight: 500, color: "#3C3489" }}>{umkreis} km</span>
@@ -482,7 +551,7 @@ function EintragenTab({ onSubmit }) {
 function SucheTab({ games, userLocation, onSelectGame }) {
   const [results, setResults] = useState(null);
   const [km, setKm] = useState(30);
-  const [filter, setFilter] = useState({ jugend: "", typ: "", datum: "", staerke: "", rasen: "" });
+  const [filter, setFilter] = useState({ kategorie: "", typ: "", datum: "", staerke: "", rasen: "" });
 
   function set(key, val) { setFilter((f) => ({ ...f, [key]: val })); }
 
@@ -490,7 +559,8 @@ function SucheTab({ games, userLocation, onSelectGame }) {
     const loc = userLocation;
     const res = games
       .filter((g) => {
-        if (filter.jugend && !g.jugend.includes(filter.jugend.split(" ")[0])) return false;
+        const mannschaft = g.mannschaft || g.jugend || "";
+        if (filter.kategorie && getKategorie(mannschaft) !== filter.kategorie) return false;
         if (filter.typ && g.type !== filter.typ) return false;
         if (filter.datum && g.datum < filter.datum) return false;
         if (filter.staerke && g.staerke !== parseInt(filter.staerke)) return false;
@@ -521,10 +591,10 @@ function SucheTab({ games, userLocation, onSelectGame }) {
         <div style={{ fontSize: 11, fontWeight: 500, color: "#aaa", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 12 }}>Spiel finden</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
           <div>
-            <label style={labelStyle}>Jahrgang</label>
-            <select style={selectStyle} value={filter.jugend} onChange={(e) => set("jugend", e.target.value)}>
+            <label style={labelStyle}>Kategorie</label>
+            <select style={selectStyle} value={filter.kategorie} onChange={(e) => set("kategorie", e.target.value)}>
               <option value="">Alle</option>
-              {["E-Jugend (U10)", "D-Jugend (U12)", "C-Jugend (U14)", "B-Jugend (U17)", "A-Jugend (U19)"].map((j) => <option key={j}>{j}</option>)}
+              {Object.keys(MANNSCHAFTEN).map((k) => <option key={k}>{k}</option>)}
             </select>
           </div>
           <div>
@@ -632,7 +702,7 @@ export default function App() {
       .from("games")
       .insert([{
         type: formData.type,
-        jugend: formData.jugend,
+        mannschaft: formData.mannschaft,
         datum: formData.datum,
         uhrzeit: formData.uhrzeit,
         rasen: formData.rasen,
