@@ -24,8 +24,8 @@ const C = {
   accent:   "#30D158",
   accentDim:"rgba(48,209,88,0.15)",
   text:     "#FFFFFF",
-  textSub:  "#8E8E93",
-  textDim:  "#48484A",
+  textSub:  "#C7C7CC",   // war #8E8E93 — deutlich heller
+  textDim:  "#98989D",   // war #48484A — deutlich heller
 };
 
 // Kategorie-Akzentfarben (iOS-Stil)
