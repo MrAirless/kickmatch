@@ -233,8 +233,8 @@ function GameCard({ game, userLocation, onClick }) {
         <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
           <Badge variant={game.type === "angebot" ? "offer" : "search"}>{game.type === "angebot" ? "⚽ Angebot" : "🔍 Anfrage"}</Badge>
           {kat && <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: c.bg, color: c.text, border: `1px solid ${c.border}` }}>{kat}</span>}
-          {game.status === "gebucht" && <Badge variant="green">✓ Gebucht</Badge>}
-          {game.schiri_benoetigt && <Badge variant={game.schiri_status === "besetzt" ? "green" : "yellow"}>🟡 {game.schiri_status === "besetzt" ? "Schiri ✓" : "Schiri gesucht"}</Badge>}
+          {game.status === "gebucht" && <Badge variant="green">Gebucht</Badge>}
+          {game.schiri_benoetigt && <Badge variant={game.schiri_status === "besetzt" ? "yellow" : "yellow"}>🟡 {game.schiri_status === "besetzt" ? "Schiri ✓" : "Schiri gesucht"}</Badge>}
         </div>
         <div style={{ display: "flex", gap: 5, alignItems: "center", flexShrink: 0, marginLeft: 8 }}>
           {dist !== null && <Badge variant="gray">{dist} km</Badge>}
@@ -258,6 +258,52 @@ function GameCard({ game, userLocation, onClick }) {
       {game.wichtige_infos && (
         <div style={{ marginTop: 8, padding: "7px 10px", background: "#FAEEDA", borderRadius: 6, fontSize: 12, color: "#633806", border: "1px solid #F0C98A" }}>ℹ️ {game.wichtige_infos}</div>
       )}
+    </div>
+  );
+}
+
+// ─── Gebuchte Spiele Karte (mit Buchungsdetails) ───────────────────────────────
+
+function GebuchteSpielKarte({ game, buchung, userLocation, onClick }) {
+  const dist = userLocation && game.lat && game.lng ? haversine(userLocation.lat, userLocation.lng, game.lat, game.lng) : null;
+  const mannschaft = game.mannschaft || game.jugend || "";
+  const kat = getKategorie(mannschaft);
+  const c = kategorieColor(kat);
+
+  return (
+    <div onClick={() => onClick(game)}
+      style={{ background: "white", border: "1.5px solid #F09595", borderRadius: 12, padding: "1rem 1.25rem", marginBottom: 10, cursor: "pointer", boxShadow: "0 1px 4px rgba(240,149,149,0.15)" }}
+      onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#e07070"; e.currentTarget.style.boxShadow = "0 2px 12px rgba(240,149,149,0.25)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#F09595"; e.currentTarget.style.boxShadow = "0 1px 4px rgba(240,149,149,0.15)"; }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+        <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+          <Badge variant="green">Gebucht</Badge>
+          {kat && <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: c.bg, color: c.text, border: `1px solid ${c.border}` }}>{kat}</span>}
+        </div>
+        <div style={{ display: "flex", gap: 5, alignItems: "center", flexShrink: 0 }}>
+          {dist !== null && <Badge variant="gray">{dist} km</Badge>}
+          <span style={{ fontSize: 12, color: "#777", fontWeight: 500 }}>{formatDate(game.datum)}</span>
+        </div>
+      </div>
+
+      <div style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a", marginBottom: 2 }}>vs. {game.verein}</div>
+      <div style={{ fontSize: 13, color: "#555", marginBottom: 8 }}>{mannschaft}</div>
+      <div style={{ height: 1, background: "#f0f0f0", marginBottom: 8 }} />
+
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 8 }}>
+        <span style={{ fontSize: 12, color: "#666" }}>🕐 {game.uhrzeit} Uhr</span>
+        {game.platz && <span style={{ fontSize: 12, color: "#666" }}>📍 {game.platz}</span>}
+        <span style={{ fontSize: 12, color: "#666" }}>🌿 {game.rasen}</span>
+      </div>
+
+      {/* Kontaktdaten des Gegners */}
+      <div style={{ background: "#f8f8f8", borderRadius: 8, padding: "10px 12px", border: "1px solid #ebebeb" }}>
+        <div style={{ fontSize: 11, color: "#999", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 6 }}>Kontakt Gegner</div>
+        <div style={{ fontSize: 13, color: "#1a1a1a", fontWeight: 600, marginBottom: 2 }}>{buchung.anbieter_name}</div>
+        <div style={{ fontSize: 13, color: "#1a1a1a", marginBottom: 2 }}>{buchung.anbieter_verein}</div>
+        <div style={{ fontSize: 13, color: "#185FA5", fontWeight: 500 }}>{buchung.anbieter_tel}</div>
+      </div>
     </div>
   );
 }
@@ -311,12 +357,8 @@ function SchiriBewerbungModal({ game, onClose, onConfirm }) {
     if (!form.name || !form.telefon) { alert("Bitte Name und Telefon ausfüllen."); return; }
     setLoading(true);
     const { error } = await supabase.from("schiri_anfragen").insert([{
-      game_id: game.id,
-      schiri_name: form.name,
-      schiri_tel: form.telefon,
-      schiri_lizenz: form.lizenz,
-      nachricht: form.nachricht || null,
-      status: "offen",
+      game_id: game.id, schiri_name: form.name, schiri_tel: form.telefon,
+      schiri_lizenz: form.lizenz, nachricht: form.nachricht || null, status: "offen",
     }]);
     if (error) { alert("Fehler: " + error.message); setLoading(false); return; }
     await supabase.from("games").update({ schiri_status: "angefragt" }).eq("id", game.id);
@@ -329,9 +371,6 @@ function SchiriBewerbungModal({ game, onClose, onConfirm }) {
       <div onClick={(e) => e.stopPropagation()} style={{ background: "white", borderRadius: 16, padding: "1.5rem", maxWidth: 440, width: "100%", maxHeight: "85vh", overflowY: "auto", border: "1px solid #e0e0e0", boxShadow: "0 8px 32px rgba(0,0,0,0.15)" }}>
         <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>🟡 Als Schiedsrichter bewerben</div>
         <div style={{ fontSize: 13, color: "#777", marginBottom: 16 }}>{game.verein} · {formatDate(game.datum)} · {game.uhrzeit} Uhr</div>
-        <div style={{ background: "#FFFBE6", border: "1px solid #F5D87A", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#7A5C00" }}>
-          Deine Kontaktdaten werden dem Trainer übermittelt.
-        </div>
         {[
           { label: "Dein Name", key: "name", type: "text", placeholder: "Vor- und Nachname" },
           { label: "Deine Telefonnummer", key: "telefon", type: "tel", placeholder: "+49 ..." },
@@ -357,7 +396,7 @@ function SchiriBewerbungModal({ game, onClose, onConfirm }) {
   );
 }
 
-// ─── Schiri-Anfragen-Modal (für Trainer) ──────────────────────────────────────
+// ─── Schiri-Anfragen-Modal ─────────────────────────────────────────────────────
 
 function SchiriAnfragenModal({ game, onClose, onBestaetigen }) {
   const [anfragen, setAnfragen] = useState([]);
@@ -391,7 +430,7 @@ function SchiriAnfragenModal({ game, onClose, onBestaetigen }) {
             <div key={a.id} style={{ background: "#f8f8f8", border: `1.5px solid ${a.status === "bestaetigt" ? "#B8DCA0" : a.status === "abgelehnt" ? "#F09595" : "#e0e0e0"}`, borderRadius: 10, padding: "1rem", marginBottom: 10 }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
                 <div style={{ fontSize: 15, fontWeight: 700 }}>{a.schiri_name}</div>
-                {a.status === "bestaetigt" && <Badge variant="green">✓ Bestätigt</Badge>}
+                {a.status === "bestaetigt" && <Badge variant="blue">✓ Bestätigt</Badge>}
                 {a.status === "abgelehnt" && <Badge variant="red">✗ Abgelehnt</Badge>}
                 {a.status === "offen" && <Badge variant="yellow">Offen</Badge>}
               </div>
@@ -429,17 +468,14 @@ function DetailModal({ game, userLocation, session, onClose, onBook, onRefresh }
       <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 16 }}>
         <div onClick={(e) => e.stopPropagation()} style={{ background: "white", borderRadius: 16, padding: "1.5rem", maxWidth: 440, width: "100%", maxHeight: "85vh", overflowY: "auto", position: "relative", border: "1px solid #e0e0e0", boxShadow: "0 8px 32px rgba(0,0,0,0.15)" }}>
           <button onClick={onClose} style={{ position: "absolute", top: 12, right: 12, width: 28, height: 28, borderRadius: "50%", border: "1px solid #e0e0e0", background: "#f5f5f5", cursor: "pointer", fontSize: 13 }}>✕</button>
-
           <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginBottom: 12 }}>
             <Badge variant={game.type === "angebot" ? "offer" : "search"}>{game.type === "angebot" ? "⚽ Angebot" : "🔍 Anfrage"}</Badge>
             {kat && <span style={{ display: "inline-flex", alignItems: "center", padding: "3px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, background: c.bg, color: c.text, border: `1px solid ${c.border}` }}>{kat}</span>}
-            {game.status === "gebucht" && <Badge variant="green">✓ Gebucht</Badge>}
+            {game.status === "gebucht" && <Badge variant="green">Gebucht</Badge>}
             {dist !== null && <Badge variant="gray">{dist} km</Badge>}
           </div>
-
           <div style={{ fontSize: 20, fontWeight: 700, marginBottom: 2 }}>{game.verein}</div>
           <div style={{ fontSize: 14, color: "#555", fontWeight: 500, marginBottom: 16 }}>{mannschaft}</div>
-
           <div style={{ background: "#f8f8f8", borderRadius: 10, border: "1px solid #ebebeb", overflow: "hidden", marginBottom: 12 }}>
             {[
               { icon: "📅", label: "Datum & Uhrzeit", value: `${formatDate(game.datum)} um ${game.uhrzeit} Uhr` },
@@ -459,7 +495,6 @@ function DetailModal({ game, userLocation, session, onClose, onBook, onRefresh }
               </div>
             ))}
           </div>
-
           <div style={{ background: "#f8f8f8", borderRadius: 10, border: "1px solid #ebebeb", padding: "10px 14px", marginBottom: 12, display: "flex", alignItems: "center", gap: 10 }}>
             <span style={{ fontSize: 15 }}>💪</span>
             <div>
@@ -467,7 +502,6 @@ function DetailModal({ game, userLocation, session, onClose, onBook, onRefresh }
               <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}><StrengthDots value={game.staerke} /><span style={{ fontSize: 13, color: "#555" }}>Stufe {game.staerke} von 5</span></div>
             </div>
           </div>
-
           {game.schiri_benoetigt && (
             <div style={{ background: "#FFFBE6", border: "1.5px solid #F5D87A", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: "#7A5C00", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 4 }}>🟡 Schiedsrichter</div>
@@ -478,22 +512,18 @@ function DetailModal({ game, userLocation, session, onClose, onBook, onRefresh }
               </div>
             </div>
           )}
-
           {game.wichtige_infos && (
             <div style={{ background: "#FAEEDA", border: "1.5px solid #F0C98A", borderRadius: 10, padding: "12px 14px", marginBottom: 12 }}>
               <div style={{ fontSize: 11, color: "#633806", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 5 }}>ℹ️ Wichtige Infos</div>
               <div style={{ fontSize: 14, color: "#633806", lineHeight: 1.6 }}>{game.wichtige_infos}</div>
             </div>
           )}
-
           {mapsUrl && <a href={mapsUrl} target="_blank" rel="noreferrer" style={{ display: "block", width: "100%", padding: 11, background: "#378ADD", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 500, marginBottom: 8, textAlign: "center", textDecoration: "none" }}>🗺️ Navigation starten</a>}
-
           {game.schiri_benoetigt && game.schiri_status === "angefragt" && !istSchiri && (
             <button onClick={() => setShowSchiriAnfragen(true)} style={{ width: "100%", padding: 11, background: "#FFFBE6", color: "#7A5C00", border: "1.5px solid #F5D87A", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer", marginBottom: 8 }}>
               🟡 Schiedsrichter-Bewerbungen ansehen
             </button>
           )}
-
           {game.status !== "gebucht" ? (
             <button onClick={() => { onClose(); onBook(game); }} style={{ width: "100%", padding: 13, background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer" }}>
               ⚡ Spiel jetzt annehmen
@@ -503,7 +533,6 @@ function DetailModal({ game, userLocation, session, onClose, onBook, onRefresh }
           )}
         </div>
       </div>
-
       {showSchiriAnfragen && (
         <SchiriAnfragenModal game={game} onClose={() => setShowSchiriAnfragen(false)} onBestaetigen={() => { setShowSchiriAnfragen(false); onRefresh(); onClose(); }} />
       )}
@@ -529,11 +558,9 @@ function BookingModal({ game, session, onClose, onConfirm }) {
       <div onClick={(e) => e.stopPropagation()} style={{ background: "white", borderRadius: 16, padding: "1.5rem", maxWidth: 440, width: "100%", maxHeight: "85vh", overflowY: "auto", border: "1px solid #e0e0e0", boxShadow: "0 8px 32px rgba(0,0,0,0.15)" }}>
         <div style={{ fontSize: 17, fontWeight: 700, marginBottom: 4 }}>Buchung abschließen</div>
         <div style={{ fontSize: 13, color: "#777", marginBottom: 16 }}>{game.verein} · {formatDate(game.datum)} · {game.uhrzeit} Uhr</div>
-
         <div style={{ background: "#E6F1FB", border: "1px solid #B5D4F4", borderRadius: 8, padding: "10px 14px", marginBottom: 16, fontSize: 13, color: "#0C447C" }}>
-          📧 Nach der Buchung erhalten beide Trainer eine Bestätigungs-E-Mail mit den gegenseitigen Kontaktdaten.
+          📧 Beide Trainer erhalten eine Bestätigungs-E-Mail mit den Kontaktdaten.
         </div>
-
         {[
           { label: "Dein Name", key: "name", type: "text", placeholder: "Vor- und Nachname" },
           { label: "Dein Verein", key: "verein", type: "text", placeholder: "z.B. FC Musterstadt" },
@@ -545,12 +572,10 @@ function BookingModal({ game, session, onClose, onConfirm }) {
             <input type={f.type} placeholder={f.placeholder} value={form[f.key]} onChange={(e) => setForm({ ...form, [f.key]: e.target.value })} style={inp} />
           </div>
         ))}
-
         <div style={{ marginBottom: 14 }}>
           <label style={{ ...lbl, marginBottom: 8 }}>Deine Mannschaft</label>
           <MannschaftAuswahl value={form.mannschaft} onChange={(v) => setForm({ ...form, mannschaft: v })} />
         </div>
-
         <button onClick={handleSubmit} disabled={loading} style={{ width: "100%", padding: 13, background: "#1D9E75", color: "white", border: "none", borderRadius: 8, fontSize: 15, fontWeight: 600, cursor: "pointer", opacity: loading ? 0.7 : 1 }}>
           {loading ? "Wird gespeichert..." : "Buchung bestätigen"}
         </button>
@@ -670,15 +695,10 @@ function EintragenTab({ onSubmit }) {
             <div style={{ width: 20, height: 20, borderRadius: "50%", background: "white", position: "absolute", top: 2, left: schiriBenoetigt ? 22 : 2, transition: "left .2s", boxShadow: "0 1px 3px rgba(0,0,0,0.2)" }} />
           </div>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: "#1a1a1a" }}>Schiedsrichter wird benötigt</div>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>Schiedsrichter wird benötigt</div>
             <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>Das Spiel erscheint in der Schiedsrichter-Börse</div>
           </div>
         </label>
-        {schiriBenoetigt && (
-          <div style={{ marginTop: 12, padding: "10px 14px", background: "#FFFBE6", border: "1px solid #F5D87A", borderRadius: 8, fontSize: 13, color: "#7A5C00" }}>
-            🟡 Schiedsrichter können sich direkt für dieses Spiel bewerben.
-          </div>
-        )}
       </div>
 
       <div style={sec}>
@@ -773,7 +793,7 @@ function SchiriBörseTab({ games, userLocation, session, onRefresh }) {
     <div>
       <div style={{ background: "#FFFBE6", border: "1.5px solid #F5D87A", borderRadius: 12, padding: "12px 16px", marginBottom: 14, fontSize: 13, color: "#7A5C00" }}>
         <div style={{ fontWeight: 700, marginBottom: 4 }}>🟡 Schiedsrichter-Börse</div>
-        <div>Hier findest du alle Spiele die einen Schiedsrichter suchen.</div>
+        <div>Alle Spiele die einen Schiedsrichter suchen.</div>
       </div>
       {toast && <div style={{ background: "#1D9E75", color: "white", padding: "10px 16px", borderRadius: 8, marginBottom: 12, fontSize: 13, fontWeight: 500 }}>✓ {toast}</div>}
       <SortierBar sortBy={sortBy} onChange={setSortBy} userLocation={userLocation} />
@@ -820,7 +840,6 @@ function SucheTab({ games, userLocation, onSelectGame }) {
   return (
     <div>
       {!userLocation && <div style={{ background: "#FAEEDA", border: "1.5px solid #F0C98A", borderRadius: 10, padding: "10px 14px", marginBottom: 12, fontSize: 13, color: "#633806", fontWeight: 500 }}>⚠️ Kein Standort gesetzt.</div>}
-
       <div style={sec}>
         <SectionLabel>Mannschaft</SectionLabel>
         <div style={{ display: "flex", gap: 4, marginBottom: 10, background: "#f0f2f5", borderRadius: 10, padding: 4 }}>
@@ -845,7 +864,6 @@ function SucheTab({ games, userLocation, onSelectGame }) {
           </div>
         )}
       </div>
-
       <div style={sec}>
         <SectionLabel>Weitere Filter</SectionLabel>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 10 }}>
@@ -866,7 +884,6 @@ function SucheTab({ games, userLocation, onSelectGame }) {
           <button onClick={search} style={{ padding: 11, background: "#185FA5", color: "white", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>Suchen</button>
         </div>
       </div>
-
       {results !== null && (
         <>
           <div style={{ fontSize: 12, color: "#888", marginBottom: 10 }}>{results.length} {results.length === 1 ? "Ergebnis" : "Ergebnisse"}</div>
@@ -880,11 +897,71 @@ function SucheTab({ games, userLocation, onSelectGame }) {
 
 // ─── Tab: Meine Spiele ─────────────────────────────────────────────────────────
 
-function MeineTab({ games, userLocation, onSelectGame }) {
+function MeineTab({ userLocation, onSelectGame, session }) {
   const [sortBy, setSortBy] = useState("datum_asc");
-  const gebucht = sortiereSpiele(games.filter((g) => g.status === "gebucht"), sortBy, userLocation);
-  if (gebucht.length === 0) return <div style={{ textAlign: "center", padding: "3rem 1rem", color: "#aaa" }}>Noch keine gebuchten Spiele.<br />Finde ein Spiel im Tab „Spiele"!</div>;
-  return <div><SortierBar sortBy={sortBy} onChange={setSortBy} userLocation={userLocation} />{gebucht.map((g) => <GameCard key={g.id} game={g} userLocation={userLocation} onClick={onSelectGame} />)}</div>;
+  const [meineSpiele, setMeineSpiele] = useState([]);
+  const [meineBuchungen, setMeineBuchungen] = useState([]);
+  const [laden, setLaden] = useState(true);
+
+  useEffect(() => {
+    async function ladeMeine() {
+      // Alle Buchungen wo ich als Bucher beteiligt bin
+      const { data: buchungen } = await supabase
+        .from("buchungen")
+        .select("*")
+        .eq("bucher_email", session.user.email);
+
+      if (!buchungen || buchungen.length === 0) {
+        setLaden(false);
+        return;
+      }
+
+      // Die zugehörigen Spiele laden
+      const gameIds = buchungen.map((b) => b.game_id);
+      const { data: spiele } = await supabase
+        .from("games")
+        .select("*")
+        .in("id", gameIds);
+
+      if (spiele) setMeineSpiele(spiele);
+      setMeineBuchungen(buchungen);
+      setLaden(false);
+    }
+    ladeMeine();
+  }, [session]);
+
+  const sortiert = sortiereSpiele(meineSpiele, sortBy, userLocation);
+
+  if (laden) return <Ladeindikator />;
+
+  if (sortiert.length === 0) {
+    return (
+      <div style={{ textAlign: "center", padding: "3rem 1rem", color: "#aaa" }}>
+        Noch keine gebuchten Spiele.<br />Finde ein Spiel im Tab „Spiele"!
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div style={{ background: "#FCEBEB", border: "1.5px solid #F09595", borderRadius: 12, padding: "10px 14px", marginBottom: 14, fontSize: 13, color: "#791F1F" }}>
+        <strong>{sortiert.length} gebuchte {sortiert.length === 1 ? "Spiel" : "Spiele"}</strong> — Kontaktdaten des Gegners sind direkt auf der Karte sichtbar.
+      </div>
+      <SortierBar sortBy={sortBy} onChange={setSortBy} userLocation={userLocation} />
+      {sortiert.map((g) => {
+        const buchung = meineBuchungen.find((b) => b.game_id === g.id);
+        return (
+          <GebuchteSpielKarte
+            key={g.id}
+            game={g}
+            buchung={buchung}
+            userLocation={userLocation}
+            onClick={onSelectGame}
+          />
+        );
+      })}
+    </div>
+  );
 }
 
 // ─── Haupt-App ─────────────────────────────────────────────────────────────────
@@ -961,7 +1038,7 @@ export default function App() {
 
     if (updateError) { alert("Fehler beim Buchen: " + updateError.message); return; }
 
-    // 2. Buchung dauerhaft in Supabase speichern
+    // 2. Buchung dauerhaft speichern
     const buchungsDaten = {
       game_id: bookingGame.id,
       anbieter_name: bookingGame.trainer_name,
@@ -978,24 +1055,16 @@ export default function App() {
       uhrzeit: bookingGame.uhrzeit,
     };
 
-    const { error: buchungError } = await supabase
-      .from("buchungen")
-      .insert([buchungsDaten]);
+    await supabase.from("buchungen").insert([buchungsDaten]);
 
-    if (buchungError) {
-      console.error("Buchung konnte nicht gespeichert werden:", buchungError.message);
-    }
-
-    // 3. E-Mail-Benachrichtigung über Edge Function senden
+    // 3. E-Mail-Benachrichtigung senden
     try {
-      await supabase.functions.invoke("buchung-bestaetigung", {
-        body: buchungsDaten,
-      });
+      await supabase.functions.invoke("buchung-bestaetigung", { body: buchungsDaten });
     } catch (err) {
       console.error("E-Mail konnte nicht gesendet werden:", err);
     }
 
-    // 4. Lokalen State aktualisieren
+    // 4. State aktualisieren
     setGames((prev) => prev.map((g) => g.id === bookingGame.id ? { ...g, status: "gebucht" } : g));
     setBookingGame(null);
     showToast("Spiel gebucht! Bestätigungs-E-Mail wurde versendet.");
@@ -1044,7 +1113,13 @@ export default function App() {
       {activeTab === "neu" && !istSchiri && <EintragenTab onSubmit={handleAddGame} />}
       {activeTab === "suche" && <SucheTab games={games} userLocation={userLocation} onSelectGame={setSelectedGame} />}
       {activeTab === "boerse" && <SchiriBörseTab games={games} userLocation={userLocation} session={session} onRefresh={ladeSpiele} />}
-      {activeTab === "meine" && !istSchiri && <MeineTab games={games} userLocation={userLocation} onSelectGame={setSelectedGame} />}
+      {activeTab === "meine" && !istSchiri && (
+        <MeineTab
+          userLocation={userLocation}
+          onSelectGame={setSelectedGame}
+          session={session}
+        />
+      )}
 
       {selectedGame && currentGame && (
         <DetailModal
