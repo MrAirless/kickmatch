@@ -124,13 +124,23 @@ export default function GameDetail() {
 
   useEffect(() => {
     if (!game || !session) return;
-    if (game.anbieter_email === session.user?.email) {
+    const email = session.user?.email;
+    if (game.anbieter_email === email) {
       supabase.from("buchungen").select("*").eq("game_id", id)
         .then(({ data }) => { if (data) setAnfragen(data); });
     }
     if (game.status === "gebucht") {
       supabase.from("buchungen").select("*").eq("game_id", id).single()
-        .then(({ data }) => { if (data) setBuchung(data); });
+        .then(({ data }) => {
+          if (data) {
+            setBuchung(data);
+            // Anfragen auch laden wenn anbieter_email in buchung steht (Fallback für ältere Spiele)
+            if (!game.anbieter_email && data.anbieter_email === email) {
+              supabase.from("buchungen").select("*").eq("game_id", id)
+                .then(({ data: alle }) => { if (alle) setAnfragen(alle); });
+            }
+          }
+        });
     }
   }, [game, session, id]);
 
@@ -195,6 +205,16 @@ export default function GameDetail() {
     showToast("Spiel wieder online gestellt!");
   }
 
+  async function handleAblehnen(anfrage) {
+    if (!window.confirm(`Anfrage von ${anfrage.bucher_verein} ablehnen?`)) return;
+    await supabase.from("buchungen").delete().eq("id", anfrage.id);
+    await supabase.from("games").update({ status: "offen" }).eq("id", id);
+    setAnfragen((prev) => prev.filter((a) => a.id !== anfrage.id));
+    setGame((g) => ({ ...g, status: "offen" }));
+    setBuchung(null);
+    showToast("Anfrage abgelehnt.");
+  }
+
   if (laden) return (
     <div className="flex justify-center items-center py-32">
       <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
@@ -211,8 +231,12 @@ export default function GameDetail() {
   const mannschaft = game.mannschaft || game.jugend || "";
   const kat = getKategorie(mannschaft);
   const isOffer = game.type === "angebot";
-  const istEigenesSpiel = session?.user?.email && game.anbieter_email === session.user.email;
-  const istBucher = buchung && session?.user?.email === buchung.bucher_email;
+  const email = session?.user?.email;
+  const istEigenesSpiel = email && (
+    game.anbieter_email === email ||
+    (buchung && buchung.anbieter_email === email)
+  );
+  const istBucher = buchung && email === buchung.bucher_email;
   const darfChatten = game.status === "gebucht" && (istEigenesSpiel || istBucher);
   const senderName = istEigenesSpiel ? game.trainer_name : buchung?.bucher_name || session?.user?.email || "";
   const mapsUrl = game.adresse ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.adresse)}` : null;
@@ -326,10 +350,20 @@ export default function GameDetail() {
               ) : (
                 anfragen.map((a, i) => (
                   <div key={a.id} className={`px-4 py-3 ${i < anfragen.length - 1 ? "border-b border-gray-100" : ""}`}>
-                    <p className="text-sm font-semibold text-gray-900">{a.bucher_name} · {a.bucher_verein}</p>
-                    {a.bucher_mannschaft && <p className="text-sm text-gray-500">{a.bucher_mannschaft}</p>}
-                    <a href={`tel:${a.bucher_tel}`} className="text-sm text-brand-600 font-medium hover:underline">{a.bucher_tel}</a>
-                    {a.bucher_nachricht && <p className="text-xs text-gray-400 italic mt-0.5">"{a.bucher_nachricht}"</p>}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900">{a.bucher_name} · {a.bucher_verein}</p>
+                        {a.bucher_mannschaft && <p className="text-sm text-gray-500">{a.bucher_mannschaft}</p>}
+                        <a href={`tel:${a.bucher_tel}`} className="text-sm text-brand-600 font-medium hover:underline">{a.bucher_tel}</a>
+                        {a.bucher_nachricht && <p className="text-xs text-gray-400 italic mt-0.5">"{a.bucher_nachricht}"</p>}
+                      </div>
+                      <button
+                        onClick={() => handleAblehnen(a)}
+                        className="flex-shrink-0 text-xs text-red-500 font-medium border border-red-200 px-2.5 py-1 rounded-lg hover:bg-red-50 transition-colors"
+                      >
+                        Ablehnen
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
