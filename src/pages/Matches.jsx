@@ -1199,7 +1199,7 @@ export default function Matches() {
     const { data: aktuelleBuchungen } = await supabase.from("buchungen").select("*").eq("game_id", gameId);
     const { error } = await supabase.from("games").update({ status: "offen" }).eq("id", gameId);
     if (error) { alert("Fehler: " + error.message); return; }
-    await supabase.from("buchungen").update({ status: "angefragt" }).eq("game_id", gameId);
+    await supabase.from("buchungen").update({ status: "angefragt", bucher_gelesen: false }).eq("game_id", gameId);
     if (aktuelleBuchungen) {
       aktuelleBuchungen.filter((b) => b.status === "angenommen" && b.bucher_email).forEach((b) => {
         fetch('/api/send-push', {

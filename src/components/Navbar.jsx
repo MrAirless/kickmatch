@@ -16,19 +16,25 @@ function NotificationDropdown({ ungelesen, onKlick, onAlleGelesen }) {
         <div className="px-4 py-8 text-center text-sm text-gray-400">Keine neuen Benachrichtigungen</div>
       ) : (
         <div className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
-          {ungelesen.map((b) => (
-            <button key={b.id} onClick={() => onKlick(b)} className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors">
-              <p className="text-sm font-semibold text-gray-900 mb-0.5">
-                Neue Anfrage von {b.bucher_verein}
-              </p>
-              <p className="text-xs text-gray-500">
-                {b.bucher_name} · {b.datum} · {b.uhrzeit} Uhr
-              </p>
-              {b.bucher_mannschaft && (
-                <p className="text-xs text-gray-400 mt-0.5">{b.bucher_mannschaft}</p>
-              )}
-            </button>
-          ))}
+          {ungelesen.map((b) => {
+            const istAnbieter = b._rolle === 'anbieter'
+            return (
+              <button key={b.id + b._rolle} onClick={() => onKlick(b)} className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors">
+                <p className="text-sm font-semibold text-gray-900 mb-0.5">
+                  {istAnbieter
+                    ? `Neue Anfrage von ${b.bucher_verein}`
+                    : b.status === 'angenommen'
+                    ? `🎉 Anfrage angenommen – ${b.anbieter_verein}`
+                    : b.status === 'abgelehnt'
+                    ? `Anfrage abgelehnt – ${b.anbieter_verein}`
+                    : `Spiel wieder offen – ${b.anbieter_verein}`}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {istAnbieter ? b.bucher_name : b.bucher_name} · {b.datum} · {b.uhrzeit} Uhr
+                </p>
+              </button>
+            )
+          })}
         </div>
       )}
     </div>
@@ -48,10 +54,29 @@ export default function Navbar() {
   const [ungelesen, setUngelesen] = useState([])
   const unreadCount = ungelesen.length
 
+  async function ladeNotifications() {
+    if (!user || istSchiri) return
+    const [{ data: alsAnbieter }, { data: alsBucher }] = await Promise.all([
+      supabase.from("buchungen").select("*").eq("anbieter_email", user.email).eq("gelesen", false),
+      supabase.from("buchungen").select("*").eq("bucher_email", user.email).eq("bucher_gelesen", false),
+    ])
+    const anbieterNachrichten = (alsAnbieter || []).map((b) => ({ ...b, _rolle: 'anbieter' }))
+    const bucherNachrichten = (alsBucher || []).map((b) => ({ ...b, _rolle: 'bucher' }))
+    setUngelesen([...anbieterNachrichten, ...bucherNachrichten])
+  }
+
+  useEffect(() => {
+    ladeNotifications()
+  }, [user, istSchiri])
+
   useEffect(() => {
     if (!user || istSchiri) return
-    supabase.from("buchungen").select("*").eq("anbieter_email", user.email).eq("gelesen", false)
-      .then(({ data }) => { if (data) setUngelesen(data) })
+    const channel = supabase.channel('navbar-buchungen')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'buchungen' }, () => {
+        ladeNotifications()
+      })
+      .subscribe()
+    return () => supabase.removeChannel(channel)
   }, [user, istSchiri])
 
   useEffect(() => {
@@ -63,14 +88,21 @@ export default function Navbar() {
   }, [])
 
   async function handleNotificationClick(b) {
-    await supabase.from("buchungen").update({ gelesen: true }).eq("id", b.id)
-    setUngelesen((prev) => prev.filter((x) => x.id !== b.id))
+    if (b._rolle === 'anbieter') {
+      await supabase.from("buchungen").update({ gelesen: true }).eq("id", b.id)
+    } else {
+      await supabase.from("buchungen").update({ bucher_gelesen: true }).eq("id", b.id)
+    }
+    setUngelesen((prev) => prev.filter((x) => !(x.id === b.id && x._rolle === b._rolle)))
     setGlockeOffen(false)
     window.location.href = `/spiele/${b.game_id}`
   }
 
   async function alleGelesen() {
-    await supabase.from("buchungen").update({ gelesen: true }).in("id", ungelesen.map((b) => b.id))
+    const anbieterIds = ungelesen.filter((b) => b._rolle === 'anbieter').map((b) => b.id)
+    const bucherIds = ungelesen.filter((b) => b._rolle === 'bucher').map((b) => b.id)
+    if (anbieterIds.length > 0) await supabase.from("buchungen").update({ gelesen: true }).in("id", anbieterIds)
+    if (bucherIds.length > 0) await supabase.from("buchungen").update({ bucher_gelesen: true }).in("id", bucherIds)
     setUngelesen([])
     setGlockeOffen(false)
   }

@@ -168,11 +168,11 @@ export default function GameDetail() {
   }
 
   async function handleAnnehmen(anfrage) {
-    const { error: e1 } = await supabase.from("buchungen").update({ status: "angenommen" }).eq("id", anfrage.id);
+    const { error: e1 } = await supabase.from("buchungen").update({ status: "angenommen", bucher_gelesen: false }).eq("id", anfrage.id);
     if (e1) { alert("Fehler: " + e1.message); return; }
     const andereIds = anfragen.filter((a) => a.id !== anfrage.id).map((a) => a.id);
     if (andereIds.length > 0) {
-      await supabase.from("buchungen").update({ status: "abgelehnt" }).in("id", andereIds);
+      await supabase.from("buchungen").update({ status: "abgelehnt", bucher_gelesen: false }).in("id", andereIds);
     }
     const { error: e2 } = await supabase.from("games").update({ status: "gebucht" }).eq("id", id);
     if (e2) { alert("Fehler beim Aktualisieren des Spiels: " + e2.message); return; }
@@ -212,7 +212,7 @@ export default function GameDetail() {
   async function handleOnlineStellen() {
     const { data: aktuelleBuchungen } = await supabase.from("buchungen").select("*").eq("game_id", id);
     await supabase.from("games").update({ status: "offen" }).eq("id", id);
-    await supabase.from("buchungen").update({ status: "angefragt" }).eq("game_id", id);
+    await supabase.from("buchungen").update({ status: "angefragt", bucher_gelesen: false }).eq("game_id", id);
     if (aktuelleBuchungen) {
       aktuelleBuchungen.filter((b) => b.status === "angenommen" && b.bucher_email).forEach((b) => {
         fetch('/api/send-push', {
@@ -234,7 +234,7 @@ export default function GameDetail() {
 
   async function handleAblehnen(anfrage) {
     if (!window.confirm(`Anfrage von ${anfrage.bucher_verein} ablehnen?`)) return;
-    await supabase.from("buchungen").update({ status: "abgelehnt" }).eq("id", anfrage.id);
+    await supabase.from("buchungen").update({ status: "abgelehnt", bucher_gelesen: false }).eq("id", anfrage.id);
     if (anfrage.bucher_email) {
       fetch('/api/send-push', {
         method: 'POST',
