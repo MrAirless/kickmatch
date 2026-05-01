@@ -211,7 +211,9 @@ export default function GameDetail() {
 
   async function handleOnlineStellen() {
     await supabase.from("games").update({ status: "offen" }).eq("id", id);
+    await supabase.from("buchungen").update({ status: "angefragt" }).eq("game_id", id);
     setGame((g) => ({ ...g, status: "offen" }));
+    setAnfragen((prev) => prev.map((a) => ({ ...a, status: "angefragt" })));
     showToast("Spiel wieder online gestellt!");
   }
 

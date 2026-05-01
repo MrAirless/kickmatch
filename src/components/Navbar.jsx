@@ -66,7 +66,7 @@ export default function Navbar() {
     await supabase.from("buchungen").update({ gelesen: true }).eq("id", b.id)
     setUngelesen((prev) => prev.filter((x) => x.id !== b.id))
     setGlockeOffen(false)
-    navigate(`/spiele/${b.game_id}`)
+    window.location.href = `/spiele/${b.game_id}`
   }
 
   async function alleGelesen() {
