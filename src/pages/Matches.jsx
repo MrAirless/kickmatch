@@ -487,7 +487,7 @@ function SchiriAnfragenModal({ game, onClose, onBestaetigen }) {
   );
 }
 
-function DetailModal({ game, userLocation, session, onClose, onBook, onRefresh }) {
+function DetailModal({ game, userLocation, session, onClose, onBook, onRefresh, onEdit, onOnlineStellen }) {
   const [showSchiriAnfragen, setShowSchiriAnfragen] = useState(false);
   if (!game) return null;
   const dist = userLocation && game.lat && game.lng ? haversine(userLocation.lat, userLocation.lng, game.lat, game.lng) : null;
@@ -497,6 +497,7 @@ function DetailModal({ game, userLocation, session, onClose, onBook, onRefresh }
   const mapsUrl = game.adresse ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.adresse)}` : null;
   const istSchiri = session?.user?.user_metadata?.rolle === "schiedsrichter";
   const isOffer = game.type === "angebot";
+  const istEigenesSpiel = session?.user?.email && game.anbieter_email === session.user.email;
 
   return (
     <>
@@ -577,7 +578,19 @@ function DetailModal({ game, userLocation, session, onClose, onBook, onRefresh }
             </button>
           )}
 
-          {game.status !== "gebucht" ? (
+          {istEigenesSpiel ? (
+            <div className="space-y-2">
+              <button onClick={() => { onClose(); onEdit(game); }} className="btn-primary w-full justify-center">
+                ✏️ Spiel bearbeiten
+              </button>
+              {game.status === "gebucht" && (
+                <button onClick={() => { onOnlineStellen(game.id); onClose(); }}
+                  className="w-full py-2.5 bg-brand-50 text-brand-700 border border-brand-200 rounded-xl text-sm font-semibold hover:bg-brand-100 transition-colors">
+                  🟢 Wieder online stellen
+                </button>
+              )}
+            </div>
+          ) : game.status !== "gebucht" ? (
             <button onClick={() => { onClose(); onBook(game); }} className="btn-primary w-full justify-center">
               ⚡ Spiel jetzt annehmen
             </button>
@@ -629,6 +642,264 @@ function BookingModal({ game, onClose, onConfirm }) {
         </button>
         <button onClick={onClose} className="w-full py-2.5 text-sm text-gray-400 hover:text-gray-600 mt-2">Abbrechen</button>
       </div>
+    </div>
+  );
+}
+
+function SpieleEditModal({ game, onClose, onSave }) {
+  const mannschaft0 = game.mannschaft || game.jugend || MANNSCHAFTEN.Junioren[0];
+  const [type, setType] = useState(game.type || "angebot");
+  const [mannschaft, setMannschaft] = useState(mannschaft0);
+  const [staerke, setStaerke] = useState(game.staerke || 3);
+  const [umkreis, setUmkreis] = useState(game.umkreis_km || 30);
+  const [schiriBenoetigt, setSchiriBenoetigt] = useState(game.schiri_benoetigt || false);
+  const [laden, setLaden] = useState(false);
+  const [form, setForm] = useState({
+    datum: game.datum || "",
+    uhrzeit: game.uhrzeit || "10:00",
+    rasen: game.rasen || "Naturrasen",
+    platz: game.platz || "",
+    adresse: game.adresse || "",
+    trainer_name: game.trainer_name || "",
+    telefon: game.telefon || "",
+    verein: game.verein || "",
+    spielfeld_groesse: game.spielfeld_groesse || "",
+    spieldauer: game.spieldauer ? String(game.spieldauer) : "",
+    wichtige_infos: game.wichtige_infos || "",
+  });
+
+  function set(key, val) { setForm((f) => ({ ...f, [key]: val })); }
+
+  async function handleSave() {
+    if (!form.datum || !form.trainer_name || !form.verein) { alert("Bitte Datum, Name und Verein ausfüllen."); return; }
+    setLaden(true);
+    await onSave(game.id, { ...form, type, mannschaft, staerke, umkreis_km: type === "anfrage" ? umkreis : null, schiri_benoetigt: schiriBenoetigt, schiri_status: schiriBenoetigt ? (game.schiri_status || "offen") : null });
+    setLaden(false);
+  }
+
+  return (
+    <div onClick={onClose} className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[90vh] overflow-y-auto border border-gray-100 shadow-2xl relative">
+        <button onClick={onClose} className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-sm text-gray-500 hover:bg-gray-100">✕</button>
+        <h3 className="text-lg font-bold mb-1">Spiel bearbeiten</h3>
+        <p className="text-sm text-gray-500 mb-5">{game.verein} · {formatDate(game.datum)}</p>
+        <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { val: "angebot", label: "⚽ Spiel anbieten", bg: "#E1F5EE", txt: "#085041", bd: "#A8DFC4" },
+              { val: "anfrage", label: "🔍 Spiel anfragen", bg: "#EEEDFE", txt: "#3C3489", bd: "#C5C2F8" },
+            ].map((btn) => (
+              <button key={btn.val} onClick={() => setType(btn.val)}
+                style={type === btn.val ? { background: btn.bg, color: btn.txt, borderColor: btn.bd } : {}}
+                className={`p-3 rounded-xl text-sm font-semibold border-2 transition-colors ${type === btn.val ? "" : "border-gray-200 bg-white text-gray-500 hover:border-gray-300"}`}>
+                {btn.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="card">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Mannschaft</p>
+            <MannschaftAuswahl value={mannschaft} onChange={setMannschaft} />
+          </div>
+
+          <div className="card space-y-3">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Spieldaten</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="label">Datum</label><input type="date" className="input" value={form.datum} onChange={(e) => set("datum", e.target.value)} /></div>
+              <div><label className="label">Uhrzeit</label><input type="time" className="input" value={form.uhrzeit} onChange={(e) => set("uhrzeit", e.target.value)} /></div>
+            </div>
+            <div>
+              <label className="label">Rasenart</label>
+              <select className="input" value={form.rasen} onChange={(e) => set("rasen", e.target.value)}>
+                {["Naturrasen", "Kunstrasen", "Hartplatz", "Halle"].map((r) => <option key={r}>{r}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="label">Spielstärke</label>
+              <div className="flex gap-2 mt-1.5">
+                {[1, 2, 3, 4, 5].map((n) => (
+                  <button key={n} onClick={() => setStaerke(n)}
+                    className={`w-10 h-10 rounded-full border-2 text-sm font-bold transition-colors ${staerke === n ? "border-brand-600 bg-brand-600 text-white" : "border-gray-200 bg-white text-gray-500 hover:border-brand-300"}`}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="card space-y-3">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Ort</p>
+            {type === "angebot" ? (
+              <>
+                <div><label className="label">Sportplatz Name</label><input type="text" className="input" placeholder="z.B. Sportpark Nord" value={form.platz} onChange={(e) => set("platz", e.target.value)} /></div>
+                <div><label className="label">Adresse</label><input type="text" className="input" placeholder="Musterstr. 1, 68159 Mannheim" value={form.adresse} onChange={(e) => set("adresse", e.target.value)} /></div>
+              </>
+            ) : (
+              <div><label className="label">Stadt / PLZ</label><input type="text" className="input" placeholder="z.B. Mannheim" value={form.adresse} onChange={(e) => set("adresse", e.target.value)} /></div>
+            )}
+          </div>
+
+          <div className="card space-y-3">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Trainer & Verein</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className="label">Name</label><input type="text" className="input" value={form.trainer_name} onChange={(e) => set("trainer_name", e.target.value)} /></div>
+              <div><label className="label">Telefon</label><input type="tel" className="input" value={form.telefon} onChange={(e) => set("telefon", e.target.value)} /></div>
+            </div>
+            <div><label className="label">Verein</label><input type="text" className="input" value={form.verein} onChange={(e) => set("verein", e.target.value)} /></div>
+          </div>
+
+          <div className="card">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Schiedsrichter</p>
+            <label className="flex gap-3 items-center cursor-pointer">
+              <button type="button" onClick={() => setSchiriBenoetigt(!schiriBenoetigt)}
+                className={`w-11 h-6 rounded-full relative transition-colors flex-shrink-0 ${schiriBenoetigt ? "bg-brand-600" : "bg-gray-200"}`}>
+                <span className={`absolute w-5 h-5 bg-white rounded-full top-0.5 transition-all shadow-sm ${schiriBenoetigt ? "left-5" : "left-0.5"}`} />
+              </button>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Schiedsrichter wird benötigt</p>
+                <p className="text-xs text-gray-400 mt-0.5">Das Spiel erscheint in der Schiri-Börse</p>
+              </div>
+            </label>
+          </div>
+
+          <div className="card space-y-4">
+            <div className="flex items-center gap-2">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Weitere Angaben</p>
+              <span className="text-xs bg-gray-100 text-gray-400 px-2 py-0.5 rounded-full font-semibold">Optional</span>
+            </div>
+            <div>
+              <label className="label">Spielfeldgröße</label>
+              <div className="flex flex-wrap gap-1.5">
+                {SPIELFELD_GROESSEN.map((g) => {
+                  const aktiv = form.spielfeld_groesse === g;
+                  return (
+                    <button key={g} onClick={() => set("spielfeld_groesse", aktiv ? "" : g)}
+                      className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${aktiv ? "bg-brand-50 text-brand-800 border-brand-300 font-semibold" : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
+                      {aktiv ? "✓ " : ""}{g}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div>
+              <label className="label">Spieldauer (Minuten)</label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {[40, 50, 60, 70, 80, 90].map((min) => {
+                  const aktiv = parseInt(form.spieldauer) === min;
+                  return (
+                    <button key={min} onClick={() => set("spieldauer", aktiv ? "" : min)}
+                      className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${aktiv ? "bg-brand-50 text-brand-800 border-brand-300 font-semibold" : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
+                      {aktiv ? "✓ " : ""}{min} min
+                    </button>
+                  );
+                })}
+              </div>
+              <input type="number" placeholder="Eigene Dauer…" min={10} max={180} value={form.spieldauer} onChange={(e) => set("spieldauer", e.target.value)} className="input text-sm" />
+            </div>
+            <div>
+              <label className="label">Wichtige Infos</label>
+              <textarea placeholder="z.B. Trikotfarbe, Parkplätze, Umkleiden…" value={form.wichtige_infos} onChange={(e) => set("wichtige_infos", e.target.value)} rows={3} className="input resize-y" />
+            </div>
+          </div>
+
+          {type === "anfrage" && (
+            <div className="card">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Suchradius</p>
+              <label className="label">Maximaler Umkreis: <strong className="text-gray-900">{umkreis} km</strong></label>
+              <input type="range" min={5} max={150} step={5} value={umkreis} onChange={(e) => setUmkreis(parseInt(e.target.value))} className="w-full mb-1" style={{ accentColor: "#534AB7" }} />
+              <div className="flex justify-between text-xs text-gray-400">
+                <span>5 km</span><span className="font-semibold" style={{ color: "#534AB7" }}>{umkreis} km</span><span>150 km</span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <button onClick={handleSave} disabled={laden} className="btn-primary w-full justify-center mt-5" style={{ opacity: laden ? 0.7 : 1 }}>
+          {laden ? "Wird gespeichert…" : "Änderungen speichern"}
+        </button>
+        <button onClick={onClose} className="w-full py-2.5 text-sm text-gray-400 hover:text-gray-600 mt-2">Abbrechen</button>
+      </div>
+    </div>
+  );
+}
+
+function MeineAngebotsKarte({ game, buchung, userLocation, onEdit, onOnlineStellen, onDelete, onClick }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const dist = userLocation && game.lat && game.lng ? haversine(userLocation.lat, userLocation.lng, game.lat, game.lng) : null;
+  const mannschaft = game.mannschaft || game.jugend || "";
+  const kat = getKategorie(mannschaft);
+  const c = kategorieColor(kat);
+  const isOffer = game.type === "angebot";
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mb-3" style={{ borderLeft: `4px solid ${isOffer ? "#1D9E75" : "#534AB7"}` }}>
+      <div className="p-4 cursor-pointer" onClick={() => onClick(game)}>
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="flex gap-1.5 flex-wrap">
+            <InlineBadge bg={isOffer ? "#E1F5EE" : "#EEEDFE"} color={isOffer ? "#085041" : "#3C3489"} border={isOffer ? "#A8DFC4" : "#C5C2F8"}>
+              {isOffer ? "⚽ Angebot" : "🔍 Anfrage"}
+            </InlineBadge>
+            {kat && <InlineBadge bg={c.bg} color={c.text} border={c.border}>{kat}</InlineBadge>}
+            {game.status === "gebucht"
+              ? <InlineBadge bg="#FCEBEB" color="#791F1F" border="#F09595">Gebucht</InlineBadge>
+              : <InlineBadge bg="#E1F5EE" color="#085041" border="#A8DFC4">Online</InlineBadge>
+            }
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {dist !== null && <span className="text-xs text-gray-400">{dist} km</span>}
+            <span className="text-xs text-gray-500 font-medium whitespace-nowrap">{formatDate(game.datum)}</span>
+          </div>
+        </div>
+        <p className="font-semibold text-gray-900 text-base mb-0.5">{game.verein}</p>
+        <p className="text-sm text-gray-500 mb-3">{mannschaft}</p>
+        <div className="border-t border-gray-100 pt-3 flex flex-wrap gap-3">
+          <span className="text-xs text-gray-500">🕐 {game.uhrzeit} Uhr</span>
+          {game.platz && <span className="text-xs text-gray-500">📍 {game.platz}</span>}
+          <span className="text-xs text-gray-500">🌿 {game.rasen}</span>
+        </div>
+        {buchung && game.status === "gebucht" && (
+          <div className="mt-3 bg-red-50 rounded-xl p-3 border border-red-100" onClick={(e) => e.stopPropagation()}>
+            <p className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-2">Gebucht von</p>
+            <p className="text-sm font-semibold text-gray-900">{buchung.bucher_name}</p>
+            <p className="text-sm text-gray-600">{buchung.bucher_verein}{buchung.bucher_mannschaft ? ` · ${buchung.bucher_mannschaft}` : ""}</p>
+            <p className="text-sm text-brand-600 font-medium mt-0.5">{buchung.bucher_tel}</p>
+            {buchung.bucher_nachricht && (
+              <p className="text-xs text-gray-400 italic mt-1">"{buchung.bucher_nachricht}"</p>
+            )}
+          </div>
+        )}
+      </div>
+
+      {confirmDelete ? (
+        <div className="border-t border-red-100 px-4 py-3 bg-red-50 flex items-center gap-3">
+          <p className="text-xs text-red-700 font-semibold flex-1">Wirklich löschen?</p>
+          <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }}
+            className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-600 hover:border-gray-300 transition-colors">
+            Abbrechen
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(game.id); }}
+            className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-xs font-semibold hover:bg-red-700 transition-colors">
+            Ja, löschen
+          </button>
+        </div>
+      ) : (
+        <div className="border-t border-gray-100 px-4 py-2.5 flex gap-2 bg-gray-50">
+          <button onClick={(e) => { e.stopPropagation(); onEdit(game); }}
+            className="flex-1 py-2 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-gray-700 hover:border-gray-300 transition-colors">
+            ✏️ Bearbeiten
+          </button>
+          {game.status === "gebucht" && (
+            <button onClick={(e) => { e.stopPropagation(); onOnlineStellen(game.id); }}
+              className="flex-1 py-2 bg-brand-50 border border-brand-200 rounded-lg text-xs font-semibold text-brand-700 hover:bg-brand-100 transition-colors">
+              🟢 Wieder online
+            </button>
+          )}
+          <button onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
+            className="py-2 px-3 bg-white border border-gray-200 rounded-lg text-xs font-semibold text-red-400 hover:border-red-200 hover:text-red-600 transition-colors">
+            🗑️
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -996,26 +1267,33 @@ function SucheTab({ games, userLocation, onSelectGame }) {
   );
 }
 
-function MeineTab({ userLocation, onSelectGame, session }) {
+function MeineTab({ userLocation, onSelectGame, session, allGames, onEdit, onOnlineStellen, onDelete }) {
   const [sortBy, setSortBy] = useState("datum_asc");
-  const [meineSpiele, setMeineSpiele] = useState([]);
   const [meineBuchungen, setMeineBuchungen] = useState([]);
+  const [buchungsSpiele, setBuchungsSpiele] = useState([]);
+  const [angebotsBuchungen, setAngebotsBuchungen] = useState([]);
   const [laden, setLaden] = useState(true);
+  const [activeSection, setActiveSection] = useState("eigene");
 
   useEffect(() => {
-    async function ladeMeine() {
-      const { data: buchungen } = await supabase.from("buchungen").select("*").eq("bucher_email", session.user.email);
+    async function ladeBuchungen() {
+      const [{ data: buchungen }, { data: aB }] = await Promise.all([
+        supabase.from("buchungen").select("*").eq("bucher_email", session.user.email),
+        supabase.from("buchungen").select("*").eq("anbieter_email", session.user.email),
+      ]);
+      if (aB) setAngebotsBuchungen(aB);
       if (!buchungen || buchungen.length === 0) { setLaden(false); return; }
       const gameIds = buchungen.map((b) => b.game_id);
       const { data: spiele } = await supabase.from("games").select("*").in("id", gameIds);
-      if (spiele) setMeineSpiele(spiele);
+      if (spiele) setBuchungsSpiele(spiele);
       setMeineBuchungen(buchungen);
       setLaden(false);
     }
-    ladeMeine();
+    ladeBuchungen();
   }, [session]);
 
-  const sortiert = sortiereSpiele(meineSpiele, sortBy, userLocation);
+  const eigeneSpiele = sortiereSpiele(allGames.filter((g) => g.anbieter_email === session.user.email), sortBy, userLocation);
+  const sortierteGebucht = sortiereSpiele(buchungsSpiele, sortBy, userLocation);
 
   if (laden) return (
     <div className="flex justify-center py-16">
@@ -1023,23 +1301,54 @@ function MeineTab({ userLocation, onSelectGame, session }) {
     </div>
   );
 
-  if (sortiert.length === 0) return (
-    <div className="card text-center py-16 text-gray-400">
-      <p className="text-lg mb-1">Keine gebuchten Spiele</p>
-      <p className="text-sm">Finde ein Spiel im Tab „Spiele"!</p>
-    </div>
-  );
-
   return (
     <div>
-      <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 text-sm text-red-700">
-        <strong>{sortiert.length} gebuchte {sortiert.length === 1 ? "Spiel" : "Spiele"}</strong> — Kontaktdaten direkt sichtbar.
+      <div className="flex gap-1 mb-4 bg-gray-100 rounded-xl p-1">
+        <button onClick={() => setActiveSection("eigene")}
+          className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${activeSection === "eigene" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}>
+          Meine Spiele ({eigeneSpiele.length})
+        </button>
+        <button onClick={() => setActiveSection("gebucht")}
+          className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${activeSection === "gebucht" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}>
+          Buchungen ({sortierteGebucht.length})
+        </button>
       </div>
+
       <SortierBar sortBy={sortBy} onChange={setSortBy} userLocation={userLocation} />
-      {sortiert.map((g) => {
-        const buchung = meineBuchungen.find((b) => b.game_id === g.id);
-        return <GebuchteSpielKarte key={g.id} game={g} buchung={buchung} userLocation={userLocation} onClick={onSelectGame} />;
-      })}
+
+      {activeSection === "eigene" && (
+        eigeneSpiele.length === 0 ? (
+          <div className="card text-center py-16 text-gray-400">
+            <p className="text-lg mb-1">Noch keine Spiele</p>
+            <p className="text-sm">Erstelle dein erstes Spiel im Tab „Spiel eintragen"!</p>
+          </div>
+        ) : (
+          eigeneSpiele.map((g) => (
+            <MeineAngebotsKarte key={g.id} game={g} buchung={angebotsBuchungen.find((b) => b.game_id === g.id)}
+              userLocation={userLocation} onEdit={onEdit} onOnlineStellen={onOnlineStellen}
+              onDelete={onDelete} onClick={onSelectGame} />
+          ))
+        )
+      )}
+
+      {activeSection === "gebucht" && (
+        sortierteGebucht.length === 0 ? (
+          <div className="card text-center py-16 text-gray-400">
+            <p className="text-lg mb-1">Keine gebuchten Spiele</p>
+            <p className="text-sm">Finde ein Spiel im Tab „Spiele"!</p>
+          </div>
+        ) : (
+          <div>
+            <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-4 text-sm text-red-700">
+              <strong>{sortierteGebucht.length} gebuchte {sortierteGebucht.length === 1 ? "Spiel" : "Spiele"}</strong> — Kontaktdaten direkt sichtbar.
+            </div>
+            {sortierteGebucht.map((g) => {
+              const buchung = meineBuchungen.find((b) => b.game_id === g.id);
+              return <GebuchteSpielKarte key={g.id} game={g} buchung={buchung} userLocation={userLocation} onClick={onSelectGame} />;
+            })}
+          </div>
+        )
+      )}
     </div>
   );
 }
@@ -1055,6 +1364,7 @@ export default function Matches() {
   const [laden, setLaden] = useState(false);
   const [selectedGame, setSelectedGame] = useState(null);
   const [bookingGame, setBookingGame] = useState(null);
+  const [editGame, setEditGame] = useState(null);
   const [toast, setToast] = useState("");
   const [userLocation, setUserLocation] = useState(null);
   const [showStandortModal, setShowStandortModal] = useState(false);
@@ -1090,6 +1400,7 @@ export default function Matches() {
       spieldauer: formData.spieldauer ? parseInt(formData.spieldauer) : null, wichtige_infos: formData.wichtige_infos || null,
       schiri_benoetigt: formData.schiri_benoetigt || false, schiri_status: formData.schiri_status || null,
       lat: null, lng: null,
+      anbieter_email: session.user.email,
     }]).select();
     if (error) { alert("Fehler: " + error.message); return; }
     if (data) setGames((prev) => [data[0], ...prev]);
@@ -1115,6 +1426,37 @@ export default function Matches() {
     setTab("meine");
   }
 
+  async function handleEditGame(gameId, formData) {
+    const { error } = await supabase.from("games").update({
+      type: formData.type, mannschaft: formData.mannschaft, datum: formData.datum, uhrzeit: formData.uhrzeit,
+      rasen: formData.rasen, staerke: formData.staerke, platz: formData.platz || null, adresse: formData.adresse || null,
+      trainer_name: formData.trainer_name, telefon: formData.telefon, verein: formData.verein,
+      umkreis_km: formData.umkreis_km || null, spielfeld_groesse: formData.spielfeld_groesse || null,
+      spieldauer: formData.spieldauer ? parseInt(formData.spieldauer) : null, wichtige_infos: formData.wichtige_infos || null,
+      schiri_benoetigt: formData.schiri_benoetigt || false, schiri_status: formData.schiri_status || null,
+    }).eq("id", gameId);
+    if (error) { alert("Fehler: " + error.message); return; }
+    await ladeSpiele();
+    setEditGame(null);
+    showToast("Spiel erfolgreich aktualisiert!");
+  }
+
+  async function handleDeleteGame(gameId) {
+    await supabase.from("buchungen").delete().eq("game_id", gameId);
+    await supabase.from("schiri_anfragen").delete().eq("game_id", gameId);
+    const { error } = await supabase.from("games").delete().eq("id", gameId);
+    if (error) { alert("Fehler: " + error.message); return; }
+    setGames((prev) => prev.filter((g) => g.id !== gameId));
+    showToast("Spiel gelöscht.");
+  }
+
+  async function handleSpieleOnline(gameId) {
+    const { error } = await supabase.from("games").update({ status: "offen" }).eq("id", gameId);
+    if (error) { alert("Fehler: " + error.message); return; }
+    setGames((prev) => prev.map((g) => g.id === gameId ? { ...g, status: "offen" } : g));
+    showToast("Spiel wieder online gestellt!");
+  }
+
   const currentGame = selectedGame ? games.find((g) => g.id === selectedGame.id) : null;
 
   return (
@@ -1137,16 +1479,19 @@ export default function Matches() {
       {activeTab === "neu" && !istSchiri && <EintragenTab onSubmit={handleAddGame} />}
       {activeTab === "suche" && <SucheTab games={games} userLocation={userLocation} onSelectGame={setSelectedGame} />}
       {activeTab === "boerse" && <SchiriBörseTab games={games} userLocation={userLocation} session={session} onRefresh={ladeSpiele} />}
-      {activeTab === "meine" && !istSchiri && session && <MeineTab userLocation={userLocation} onSelectGame={setSelectedGame} session={session} />}
+      {activeTab === "meine" && !istSchiri && session && <MeineTab userLocation={userLocation} onSelectGame={setSelectedGame} session={session} allGames={games} onEdit={setEditGame} onOnlineStellen={handleSpieleOnline} onDelete={handleDeleteGame} />}
 
       {selectedGame && currentGame && (
         <DetailModal game={currentGame} userLocation={userLocation} session={session}
           onClose={() => setSelectedGame(null)}
           onBook={(g) => { setSelectedGame(null); setBookingGame(g); }}
           onRefresh={ladeSpiele}
+          onEdit={(g) => { setSelectedGame(null); setEditGame(g); }}
+          onOnlineStellen={handleSpieleOnline}
         />
       )}
       {bookingGame && <BookingModal game={bookingGame} onClose={() => setBookingGame(null)} onConfirm={handleConfirmBooking} />}
+      {editGame && <SpieleEditModal game={editGame} onClose={() => setEditGame(null)} onSave={handleEditGame} />}
       {showStandortModal && <StandortModal onClose={() => setShowStandortModal(false)} onSave={(loc) => { setUserLocation(loc); setShowStandortModal(false); showToast(`Standort: ${loc.label}`); }} />}
     </div>
   );
