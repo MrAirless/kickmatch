@@ -3,38 +3,43 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 
-function NotificationDropdown({ ungelesen, onKlick, onAlleGelesen }) {
+function NotificationDropdown({ ungelesen, ungelesenChat, onKlick, onAlleGelesen }) {
+  const alle = [
+    ...ungelesen,
+    ...Object.values(
+      ungelesenChat.reduce((acc, m) => { acc[m.game_id] = m; return acc; }, {})
+    ),
+  ]
   return (
     <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border border-gray-200 shadow-xl z-50 overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
         <span className="text-sm font-semibold text-gray-900">Benachrichtigungen</span>
-        {ungelesen.length > 0 && (
+        {alle.length > 0 && (
           <button onClick={onAlleGelesen} className="text-xs text-brand-600 hover:underline">Alle als gelesen</button>
         )}
       </div>
-      {ungelesen.length === 0 ? (
+      {alle.length === 0 ? (
         <div className="px-4 py-8 text-center text-sm text-gray-400">Keine neuen Benachrichtigungen</div>
       ) : (
         <div className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
-          {ungelesen.map((b) => {
-            const istAnbieter = b._rolle === 'anbieter'
-            return (
-              <button key={b.id + b._rolle} onClick={() => onKlick(b)} className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors">
-                <p className="text-sm font-semibold text-gray-900 mb-0.5">
-                  {istAnbieter
-                    ? `Neue Anfrage von ${b.bucher_verein}`
-                    : b.status === 'angenommen'
-                    ? `🎉 Anfrage angenommen – ${b.anbieter_verein}`
-                    : b.status === 'abgelehnt'
-                    ? `Anfrage abgelehnt – ${b.anbieter_verein}`
-                    : `Spiel wieder offen – ${b.anbieter_verein}`}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {istAnbieter ? b.bucher_name : b.bucher_name} · {b.datum} · {b.uhrzeit} Uhr
-                </p>
-              </button>
-            )
-          })}
+          {alle.map((b) => (
+            <button key={b.id + b._rolle} onClick={() => onKlick(b)} className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors">
+              <p className="text-sm font-semibold text-gray-900 mb-0.5">
+                {b._rolle === 'chat'
+                  ? `💬 Neue Chat-Nachricht`
+                  : b._rolle === 'anbieter'
+                  ? `Neue Anfrage von ${b.bucher_verein}`
+                  : b.status === 'angenommen'
+                  ? `🎉 Anfrage angenommen – ${b.anbieter_verein}`
+                  : b.status === 'abgelehnt'
+                  ? `Anfrage abgelehnt – ${b.anbieter_verein}`
+                  : `Spiel wieder offen – ${b.anbieter_verein}`}
+              </p>
+              <p className="text-xs text-gray-500">
+                {b._rolle === 'chat' ? 'Zum Spiel öffnen' : `${b.bucher_name} · ${b.datum} · ${b.uhrzeit} Uhr`}
+              </p>
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -48,14 +53,17 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false)
   const [glockeOffen, setGlockeOffen] = useState(false)
   const glockeRef = useRef(null)
+  const markingReadRef = useRef(false)
 
   const rolle = user?.user_metadata?.rolle || 'trainer'
   const istSchiri = rolle === 'schiedsrichter'
   const [ungelesen, setUngelesen] = useState([])
-  const unreadCount = ungelesen.length
+  const [ungelesenChat, setUngelesenChat] = useState([])
+  const unreadCount = ungelesen.length + ungelesenChat.length
 
   async function ladeNotifications() {
     if (!user || istSchiri) return
+    if (markingReadRef.current) return
     const [{ data: alsAnbieter }, { data: alsBucher }] = await Promise.all([
       supabase.from("buchungen").select("*").eq("anbieter_email", user.email).eq("gelesen", false),
       supabase.from("buchungen").select("*").eq("bucher_email", user.email).eq("bucher_gelesen", false),
@@ -65,15 +73,33 @@ export default function Navbar() {
     setUngelesen([...anbieterNachrichten, ...bucherNachrichten])
   }
 
+  async function ladeChatNotifications() {
+    if (!user || istSchiri) return
+    const { data: buchungen } = await supabase.from("buchungen").select("game_id")
+      .or(`anbieter_email.eq.${user.email},bucher_email.eq.${user.email}`)
+    if (!buchungen || buchungen.length === 0) return
+    const gameIds = [...new Set(buchungen.map((b) => b.game_id))]
+    const letzteGelesen = JSON.parse(localStorage.getItem('chatGelesen') || '{}')
+    const checks = await Promise.all(gameIds.map(async (gid) => {
+      const seit = letzteGelesen[gid] || '1970-01-01'
+      const { data } = await supabase.from("messages").select("id,game_id,sender_email,created_at")
+        .eq("game_id", gid).gt("created_at", seit).neq("sender_email", user.email)
+      return (data || []).map((m) => ({ ...m, _rolle: 'chat' }))
+    }))
+    setUngelesenChat(checks.flat())
+  }
+
   useEffect(() => {
     ladeNotifications()
+    ladeChatNotifications()
   }, [user, istSchiri])
 
   useEffect(() => {
     if (!user || istSchiri) return
     const channel = supabase.channel('navbar-buchungen')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'buchungen' }, () => {
-        ladeNotifications()
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'buchungen' }, () => ladeNotifications())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+        if (payload.new.sender_email !== user.email) ladeChatNotifications()
       })
       .subscribe()
     return () => supabase.removeChannel(channel)
@@ -87,24 +113,39 @@ export default function Navbar() {
     return () => document.removeEventListener("mousedown", handleClick)
   }, [])
 
+  function chatAlsGelesenMarkieren(gameId) {
+    const letzteGelesen = JSON.parse(localStorage.getItem('chatGelesen') || '{}')
+    letzteGelesen[gameId] = new Date().toISOString()
+    localStorage.setItem('chatGelesen', JSON.stringify(letzteGelesen))
+    setUngelesenChat((prev) => prev.filter((m) => m.game_id !== gameId))
+  }
+
   async function handleNotificationClick(b) {
-    if (b._rolle === 'anbieter') {
+    if (b._rolle === 'chat') {
+      chatAlsGelesenMarkieren(b.game_id)
+    } else if (b._rolle === 'anbieter') {
       await supabase.from("buchungen").update({ gelesen: true }).eq("id", b.id)
+      setUngelesen((prev) => prev.filter((x) => !(x.id === b.id && x._rolle === b._rolle)))
     } else {
       await supabase.from("buchungen").update({ bucher_gelesen: true }).eq("id", b.id)
+      setUngelesen((prev) => prev.filter((x) => !(x.id === b.id && x._rolle === b._rolle)))
     }
-    setUngelesen((prev) => prev.filter((x) => !(x.id === b.id && x._rolle === b._rolle)))
     setGlockeOffen(false)
     window.location.href = `/spiele/${b.game_id}`
   }
 
   async function alleGelesen() {
+    markingReadRef.current = true
     const anbieterIds = ungelesen.filter((b) => b._rolle === 'anbieter').map((b) => b.id)
     const bucherIds = ungelesen.filter((b) => b._rolle === 'bucher').map((b) => b.id)
     if (anbieterIds.length > 0) await supabase.from("buchungen").update({ gelesen: true }).in("id", anbieterIds)
     if (bucherIds.length > 0) await supabase.from("buchungen").update({ bucher_gelesen: true }).in("id", bucherIds)
+    const gameIds = [...new Set(ungelesenChat.map((m) => m.game_id))]
+    gameIds.forEach((gid) => chatAlsGelesenMarkieren(gid))
     setUngelesen([])
+    setUngelesenChat([])
     setGlockeOffen(false)
+    setTimeout(() => { markingReadRef.current = false }, 3000)
   }
 
   const currentTab = location.pathname === '/spiele'
@@ -179,7 +220,7 @@ export default function Navbar() {
                       </span>
                     )}
                   </button>
-                  {glockeOffen && <NotificationDropdown ungelesen={ungelesen} onKlick={handleNotificationClick} onAlleGelesen={alleGelesen} />}
+                  {glockeOffen && <NotificationDropdown ungelesen={ungelesen} ungelesenChat={ungelesenChat} onKlick={handleNotificationClick} onAlleGelesen={alleGelesen} />}
                 </div>
               )}
               <Link to="/profil" className="btn-ghost text-sm">Profil</Link>
@@ -207,7 +248,7 @@ export default function Navbar() {
                   </span>
                 )}
               </button>
-              {glockeOffen && <NotificationDropdown ungelesen={ungelesen} onKlick={handleNotificationClick} onAlleGelesen={alleGelesen} />}
+              {glockeOffen && <NotificationDropdown ungelesen={ungelesen} ungelesenChat={ungelesenChat} onKlick={handleNotificationClick} onAlleGelesen={alleGelesen} />}
             </div>
           )}
           <button
