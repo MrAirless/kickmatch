@@ -229,13 +229,15 @@ export default function Profile() {
             {portalError && (
               <div className="bg-red-50 text-red-700 text-sm px-3 py-2 rounded-lg">{portalError}</div>
             )}
-            <button
-              onClick={handleManageSubscription}
-              disabled={portalLoading}
-              className="btn-secondary text-sm w-full mt-2"
-            >
-              {portalLoading ? 'Wird geladen…' : 'Abo verwalten (kündigen, Zahlungsmethode, Rechnungen)'}
-            </button>
+            {subscription.stripe_customer_id && (
+              <button
+                onClick={handleManageSubscription}
+                disabled={portalLoading}
+                className="btn-secondary text-sm w-full mt-2"
+              >
+                {portalLoading ? 'Wird geladen…' : 'Abo verwalten (kündigen, Zahlungsmethode, Rechnungen)'}
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-3 text-sm">
