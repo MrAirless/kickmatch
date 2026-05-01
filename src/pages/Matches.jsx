@@ -901,7 +901,20 @@ export default function Matches() {
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 3000); }
 
+  async function geocodeAdresse(adresse) {
+    if (!adresse?.trim()) return { lat: null, lng: null };
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(adresse)}&format=json&limit=1&countrycodes=de`);
+      const data = await res.json();
+      if (!data.length) return { lat: null, lng: null };
+      return { lat: parseFloat(data[0].lat), lng: parseFloat(data[0].lon) };
+    } catch {
+      return { lat: null, lng: null };
+    }
+  }
+
   async function handleAddGame(formData) {
+    const { lat, lng } = await geocodeAdresse(formData.adresse);
     const { data, error } = await supabase.from("games").insert([{
       type: formData.type, mannschaft: formData.mannschaft, datum: formData.datum, uhrzeit: formData.uhrzeit,
       rasen: formData.rasen, staerke: formData.staerke, platz: formData.platz || null, adresse: formData.adresse || null,
@@ -909,7 +922,7 @@ export default function Matches() {
       umkreis_km: formData.umkreis_km || null, spielfeld_groesse: formData.spielfeld_groesse || null,
       spieldauer: formData.spieldauer ? parseInt(formData.spieldauer) : null, wichtige_infos: formData.wichtige_infos || null,
       schiri_benoetigt: formData.schiri_benoetigt || false, schiri_status: formData.schiri_status || null,
-      lat: null, lng: null,
+      lat, lng,
       anbieter_email: session.user.email,
     }]).select();
     if (error) { alert("Fehler: " + error.message); return; }
@@ -919,6 +932,7 @@ export default function Matches() {
   }
 
   async function handleEditGame(gameId, formData) {
+    const { lat, lng } = await geocodeAdresse(formData.adresse);
     const { error } = await supabase.from("games").update({
       type: formData.type, mannschaft: formData.mannschaft, datum: formData.datum, uhrzeit: formData.uhrzeit,
       rasen: formData.rasen, staerke: formData.staerke, platz: formData.platz || null, adresse: formData.adresse || null,
@@ -926,6 +940,7 @@ export default function Matches() {
       umkreis_km: formData.umkreis_km || null, spielfeld_groesse: formData.spielfeld_groesse || null,
       spieldauer: formData.spieldauer ? parseInt(formData.spieldauer) : null, wichtige_infos: formData.wichtige_infos || null,
       schiri_benoetigt: formData.schiri_benoetigt || false, schiri_status: formData.schiri_status || null,
+      lat, lng,
     }).eq("id", gameId);
     if (error) { alert("Fehler: " + error.message); return; }
     await ladeSpiele();
