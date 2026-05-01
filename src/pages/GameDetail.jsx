@@ -168,12 +168,14 @@ export default function GameDetail() {
   }
 
   async function handleAnnehmen(anfrage) {
-    await supabase.from("buchungen").update({ status: "angenommen" }).eq("id", anfrage.id);
+    const { error: e1 } = await supabase.from("buchungen").update({ status: "angenommen" }).eq("id", anfrage.id);
+    if (e1) { alert("Fehler: " + e1.message); return; }
     const andereIds = anfragen.filter((a) => a.id !== anfrage.id).map((a) => a.id);
     if (andereIds.length > 0) {
       await supabase.from("buchungen").update({ status: "abgelehnt" }).in("id", andereIds);
     }
-    await supabase.from("games").update({ status: "gebucht" }).eq("id", id);
+    const { error: e2 } = await supabase.from("games").update({ status: "gebucht" }).eq("id", id);
+    if (e2) { alert("Fehler beim Aktualisieren des Spiels: " + e2.message); return; }
     if (anfrage.bucher_email) {
       fetch('/api/send-push', {
         method: 'POST',
@@ -335,7 +337,7 @@ export default function GameDetail() {
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
                 <span className="font-semibold text-gray-900 text-sm">
-                  Anfragen ({anfragen.filter((a) => a.status === "angefragt").length} offen)
+                  Anfragen ({anfragen.filter((a) => !a.status || a.status === "angefragt").length} offen)
                 </span>
                 <div className="flex items-center gap-3">
                   <button onClick={() => setShowEdit(true)} className="text-sm text-gray-600 border border-gray-300 px-3 py-1 rounded-lg hover:bg-gray-50 transition-colors">
@@ -372,7 +374,7 @@ export default function GameDetail() {
                         {a.status === "angenommen" ? "✓ Angenommen" : a.status === "abgelehnt" ? "Abgelehnt" : "Offen"}
                       </span>
                     </div>
-                    {a.status === "angefragt" && game.status !== "gebucht" && (
+                    {(!a.status || a.status === "angefragt") && game.status !== "gebucht" && (
                       <div className="flex gap-2 mt-1">
                         <button onClick={() => handleAblehnen(a)} className="flex-1 py-1.5 text-xs text-red-500 font-medium border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
                           Ablehnen
