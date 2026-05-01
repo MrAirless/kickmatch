@@ -18,6 +18,9 @@ const AboSuccess = lazy(() => import('./pages/AboSuccess'))
 const Datenschutz = lazy(() => import('./pages/Datenschutz'))
 const Impressum = lazy(() => import('./pages/Impressum'))
 const Contact = lazy(() => import('./pages/Contact'))
+const Einladung = lazy(() => import('./pages/Einladung'))
+const Vereinsportal = lazy(() => import('./pages/Vereinsportal'))
+const Admin = lazy(() => import('./pages/Admin'))
 
 function PushSubscriber() {
   const { user } = useAuth()
@@ -61,6 +64,13 @@ export default function App() {
                 } />
                 <Route path="/profil" element={
                   <ProtectedRoute><Profile /></ProtectedRoute>
+                } />
+                <Route path="/einladung/:token" element={<Einladung />} />
+                <Route path="/vereinsportal" element={
+                  <ProtectedRoute><Vereinsportal /></ProtectedRoute>
+                } />
+                <Route path="/admin" element={
+                  <ProtectedRoute><Admin /></ProtectedRoute>
                 } />
                 <Route path="*" element={
                   <div className="max-w-2xl mx-auto px-4 py-20 text-center">

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 
@@ -183,6 +183,18 @@ export default function Profile() {
           </>
         )}
       </div>
+
+      {subscription?.plan === 'vereinslizenz' && (
+        <div className="card mt-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-gray-900">Vereinsportal</h2>
+              <p className="text-sm text-gray-400 mt-0.5">Einladungslinks & Mitglieder verwalten</p>
+            </div>
+            <Link to="/vereinsportal" className="btn-primary text-sm">Öffnen →</Link>
+          </div>
+        </div>
+      )}
 
       <div className="card mt-5">
         <h2 className="font-semibold text-gray-900 mb-4">Mein Abo</h2>

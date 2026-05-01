@@ -1,5 +1,6 @@
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
+import { randomUUID } from 'crypto'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY)
 const supabase = createClient(
@@ -69,6 +70,16 @@ export default async function handler(req, res) {
         if (error) {
           console.error('checkout.session.completed: supabase upsert failed', error)
           return res.status(500).json({ error: 'Database error' })
+        }
+
+        if (plan === 'vereinslizenz') {
+          const tokens = Array.from({ length: 10 }, () => ({
+            token: randomUUID(),
+            club_id: userId,
+            created_by: 'system',
+          }))
+          const { error: linkError } = await supabase.from('invite_links').insert(tokens)
+          if (linkError) console.error('invite_links insert failed', linkError)
         }
         break
       }
