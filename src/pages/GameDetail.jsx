@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { formatDate, getKategorie, StrengthDots, BookingModal, SpieleEditModal } from "../lib/gameShared";
@@ -16,6 +16,89 @@ function InfoRow({ label, value, href }) {
   );
 }
 
+function ChatBox({ gameId, session, senderName }) {
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const bottomRef = useRef(null);
+
+  useEffect(() => {
+    supabase.from("messages").select("*").eq("game_id", gameId).order("created_at", { ascending: true })
+      .then(({ data }) => { if (data) setMessages(data); });
+
+    const channel = supabase.channel(`messages-${gameId}`)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages", filter: `game_id=eq.${gameId}` },
+        (payload) => setMessages((prev) => [...prev, payload.new]))
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, [gameId]);
+
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  async function sendMessage() {
+    const text = input.trim();
+    if (!text) return;
+    setSending(true);
+    setInput("");
+    await supabase.from("messages").insert([{
+      game_id: gameId,
+      sender_email: session.user.email,
+      sender_name: senderName,
+      message: text,
+    }]);
+    setSending(false);
+  }
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-100">
+        <span className="font-semibold text-gray-900 text-sm">Chat</span>
+      </div>
+      <div className="h-64 overflow-y-auto p-4 space-y-3 bg-gray-50">
+        {messages.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center pt-8">Noch keine Nachrichten. Schreib die erste!</p>
+        ) : (
+          messages.map((msg) => {
+            const isOwn = msg.sender_email === session.user.email;
+            return (
+              <div key={msg.id} className={`flex ${isOwn ? "justify-end" : "justify-start"}`}>
+                <div className={`max-w-[78%] rounded-2xl px-3.5 py-2 ${isOwn ? "bg-brand-600 text-white rounded-br-sm" : "bg-white text-gray-900 border border-gray-200 rounded-bl-sm"}`}>
+                  {!isOwn && <p className="text-xs font-semibold mb-0.5 text-gray-500">{msg.sender_name}</p>}
+                  <p className="text-sm leading-relaxed break-words">{msg.message}</p>
+                  <p className={`text-xs mt-0.5 ${isOwn ? "text-brand-200" : "text-gray-400"}`}>
+                    {new Date(msg.created_at).toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}
+                  </p>
+                </div>
+              </div>
+            );
+          })
+        )}
+        <div ref={bottomRef} />
+      </div>
+      <div className="border-t border-gray-100 p-3 flex gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
+          placeholder="Nachricht schreiben…"
+          className="flex-1 px-3.5 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:border-brand-400 focus:bg-white transition-colors"
+        />
+        <button
+          onClick={sendMessage}
+          disabled={sending || !input.trim()}
+          className="px-4 py-2.5 bg-brand-600 text-white rounded-xl text-sm font-semibold disabled:opacity-40 hover:bg-brand-700 transition-colors"
+        >
+          →
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function GameDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -23,6 +106,7 @@ export default function GameDetail() {
   const [session, setSession] = useState(null);
   const [laden, setLaden] = useState(true);
   const [anfragen, setAnfragen] = useState([]);
+  const [buchung, setBuchung] = useState(null);
   const [showBuchung, setShowBuchung] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
   const [toast, setToast] = useState("");
@@ -39,9 +123,15 @@ export default function GameDetail() {
   }, [id]);
 
   useEffect(() => {
-    if (!game || !session || game.anbieter_email !== session.user?.email) return;
-    supabase.from("buchungen").select("*").eq("game_id", id)
-      .then(({ data }) => { if (data) setAnfragen(data); });
+    if (!game || !session) return;
+    if (game.anbieter_email === session.user?.email) {
+      supabase.from("buchungen").select("*").eq("game_id", id)
+        .then(({ data }) => { if (data) setAnfragen(data); });
+    }
+    if (game.status === "gebucht") {
+      supabase.from("buchungen").select("*").eq("game_id", id).single()
+        .then(({ data }) => { if (data) setBuchung(data); });
+    }
   }, [game, session, id]);
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 3000); }
@@ -101,6 +191,9 @@ export default function GameDetail() {
   const kat = getKategorie(mannschaft);
   const isOffer = game.type === "angebot";
   const istEigenesSpiel = session?.user?.email && game.anbieter_email === session.user.email;
+  const istBucher = buchung && session?.user?.email === buchung.bucher_email;
+  const darfChatten = game.status === "gebucht" && (istEigenesSpiel || istBucher);
+  const senderName = istEigenesSpiel ? game.trainer_name : buchung?.bucher_name || session?.user?.email || "";
   const mapsUrl = game.adresse ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.adresse)}` : null;
 
   return (
@@ -116,7 +209,6 @@ export default function GameDetail() {
           ← Zurück zu Spiele
         </button>
 
-        {/* Header */}
         <div className="mb-5">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -135,7 +227,6 @@ export default function GameDetail() {
 
         <div className="space-y-3">
 
-          {/* Spieldetails */}
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <InfoRow label="Datum" value={formatDate(game.datum)} />
             <InfoRow label="Anpfiff" value={`${game.uhrzeit} Uhr`} />
@@ -154,7 +245,6 @@ export default function GameDetail() {
             <InfoRow label="Telefon" value={game.telefon} href={`tel:${game.telefon}`} />
           </div>
 
-          {/* Spielort */}
           {(game.platz || game.adresse) && (
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
@@ -170,7 +260,6 @@ export default function GameDetail() {
             </div>
           )}
 
-          {/* Wichtige Infos */}
           {game.wichtige_infos && (
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-100">
@@ -180,7 +269,6 @@ export default function GameDetail() {
             </div>
           )}
 
-          {/* Schiedsrichter */}
           {game.schiri_benoetigt && (
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3">
@@ -227,6 +315,11 @@ export default function GameDetail() {
             </div>
           )}
 
+          {/* Chat — für beide Parteien wenn Spiel gebucht */}
+          {darfChatten && (
+            <ChatBox gameId={id} session={session} senderName={senderName} />
+          )}
+
           {/* CTA für andere Nutzer */}
           {!istEigenesSpiel && (
             <div className="pb-4">
@@ -235,11 +328,11 @@ export default function GameDetail() {
                   className="w-full py-3.5 bg-brand-600 text-white rounded-xl text-base font-semibold hover:bg-brand-700 transition-colors">
                   Spiel anfragen
                 </button>
-              ) : (
+              ) : !istBucher ? (
                 <div className="text-center py-3.5 text-sm text-gray-400 bg-white border border-gray-200 rounded-xl">
                   Bereits vergeben
                 </div>
-              )}
+              ) : null}
             </div>
           )}
         </div>
