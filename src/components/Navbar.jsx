@@ -121,14 +121,16 @@ export default function Navbar() {
   }
 
   function handleNotificationClick(b) {
+    if (!b?.game_id) return
     if (b._rolle === 'chat') {
       chatAlsGelesenMarkieren(b.game_id)
     } else {
-      supabase.rpc('mark_buchung_read', { p_id: b.id, p_rolle: b._rolle }).catch(() => {})
+      const field = b._rolle === 'anbieter' ? { gelesen: true } : { bucher_gelesen: true }
+      supabase.from("buchungen").update(field).eq("id", b.id)
       setUngelesen((prev) => prev.filter((x) => !(x.id === b.id && x._rolle === b._rolle)))
     }
     setGlockeOffen(false)
-    window.location.href = b._rolle === 'chat' ? `/spiele/${b.game_id}#chat` : `/spiele/${b.game_id}`
+    navigate(b._rolle === 'chat' ? `/spiele/${b.game_id}#chat` : `/spiele/${b.game_id}`)
   }
 
   async function alleGelesen() {
