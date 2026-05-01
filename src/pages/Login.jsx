@@ -27,7 +27,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <div className="w-12 h-12 bg-brand-600 rounded-xl flex items-center justify-center mx-auto mb-4 text-2xl">⚽</div>
+          <img src="/logo.png" alt="KickMatch" className="w-12 h-12 rounded-xl mx-auto mb-4" />
           <h1 className="text-2xl font-bold text-gray-900">Anmelden</h1>
           <p className="text-sm text-gray-500 mt-1">Willkommen zurück bei KickMatch</p>
         </div>

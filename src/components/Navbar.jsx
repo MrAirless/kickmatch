@@ -22,7 +22,7 @@ export default function Navbar() {
       <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
 
         <Link to="/" className="flex items-center gap-2" onClick={() => setMenuOpen(false)}>
-          <div className="w-8 h-8 bg-brand-600 rounded-lg flex items-center justify-center text-lg flex-shrink-0">⚽</div>
+          <img src="/logo.png" alt="KickMatch" className="w-8 h-8 rounded-lg flex-shrink-0" />
           <span className="font-semibold text-gray-900 text-sm">KickMatch</span>
         </Link>
 
