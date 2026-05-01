@@ -125,23 +125,14 @@ export default function GameDetail() {
   useEffect(() => {
     if (!game || !session) return;
     const email = session.user?.email;
-    if (game.anbieter_email === email) {
-      supabase.from("buchungen").select("*").eq("game_id", id)
-        .then(({ data }) => { if (data) setAnfragen(data); });
-    }
-    if (game.status === "gebucht") {
-      supabase.from("buchungen").select("*").eq("game_id", id).single()
-        .then(({ data }) => {
-          if (data) {
-            setBuchung(data);
-            // Anfragen auch laden wenn anbieter_email in buchung steht (Fallback für ältere Spiele)
-            if (!game.anbieter_email && data.anbieter_email === email) {
-              supabase.from("buchungen").select("*").eq("game_id", id)
-                .then(({ data: alle }) => { if (alle) setAnfragen(alle); });
-            }
-          }
-        });
-    }
+    supabase.from("buchungen").select("*").eq("game_id", id)
+      .then(({ data }) => {
+        if (!data) return;
+        const alsBucher = data.find((b) => b.bucher_email === email);
+        if (alsBucher) setBuchung(alsBucher);
+        const istAnbieter = game.anbieter_email === email || data.some((b) => b.anbieter_email === email);
+        if (istAnbieter) setAnfragen(data);
+      });
   }, [game, session, id]);
 
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 3000); }
