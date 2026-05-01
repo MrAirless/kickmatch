@@ -36,7 +36,7 @@ export function AuthProvider({ children }) {
       { data: profileData },
       { data: subData },
     ] = await Promise.all([
-      supabase.from('profiles').select('*').eq('id', userId).single(),
+      supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
       supabase.from('subscriptions').select('*').eq('user_id', userId).eq('status', 'active').maybeSingle(),
     ])
     setProfile(profileData)
