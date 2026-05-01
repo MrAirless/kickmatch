@@ -1023,6 +1023,9 @@ function MeineTab({ userLocation, onSelectGame, session, onEdit, onOnlineStellen
               Meine Anfragen ({sortierteAnfragen.length})
             </button>
           </div>
+          {activeSection === "eigene" && (
+            <button onClick={ladeEigeneSpiele} className="text-xs text-brand-600 hover:underline mb-3 block">↻ Aktualisieren</button>
+          )}
           {activeSection === "anfragen" && (
             <button onClick={ladeBuchungen} className="text-xs text-brand-600 hover:underline mb-3 block">↻ Aktualisieren</button>
           )}
