@@ -853,21 +853,27 @@ function KalenderAnsicht({ spiele, onSelectGame, onEdit, onOnlineStellen, onDele
           <div key={d} className="text-center text-xs font-semibold text-gray-400 py-1">{d}</div>
         ))}
       </div>
-      <div className="grid grid-cols-7 gap-0.5">
+      <div className="grid grid-cols-7 gap-0.5 items-start">
         {days.map((day, i) => {
           if (!day) return <div key={`e${i}`} />;
           const dateStr = `${jahr}-${String(monat + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
-          const hatSpiele = !!spieleByDay[dateStr];
+          const tagesSpiele = spieleByDay[dateStr] || [];
+          const hatSpiele = tagesSpiele.length > 0;
           const isSelected = selectedDay === day;
           const isHeute = day === heute.getDate() && monat === heute.getMonth() && jahr === heute.getFullYear();
           return (
             <button key={day} onClick={() => setSelectedDay(isSelected ? null : day)}
-              className={`relative h-9 rounded-lg text-sm font-medium transition-colors
+              className={`rounded-lg p-1 text-left w-full transition-colors
                 ${isSelected ? "bg-brand-600 text-white" : hatSpiele ? "bg-brand-50 text-brand-900 hover:bg-brand-100" : "text-gray-700 hover:bg-gray-50"}
                 ${isHeute && !isSelected ? "ring-2 ring-brand-400 ring-inset" : ""}`}>
-              {day}
-              {hatSpiele && !isSelected && (
-                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-brand-500" />
+              <div className={`text-xs font-semibold leading-none mb-1 ${hatSpiele ? "" : "text-center py-2"}`}>{day}</div>
+              {tagesSpiele.slice(0, 2).map((g, idx) => (
+                <div key={idx} className={`text-[10px] leading-tight truncate rounded px-0.5 mb-0.5 ${isSelected ? "text-white/90" : "text-brand-700 bg-brand-100"}`}>
+                  {g.uhrzeit?.slice(0, 5)} {g.mannschaft?.split(" ")[0]}
+                </div>
+              ))}
+              {tagesSpiele.length > 2 && (
+                <div className={`text-[10px] leading-tight ${isSelected ? "text-white/70" : "text-brand-400"}`}>+{tagesSpiele.length - 2}</div>
               )}
             </button>
           );
