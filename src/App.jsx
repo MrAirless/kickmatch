@@ -13,6 +13,7 @@ import Matches from './pages/Matches'
 import AboSuccess from './pages/AboSuccess'
 import Datenschutz from './pages/Datenschutz'
 import Impressum from './pages/Impressum'
+import Contact from './pages/Contact'
 
 export default function App() {
   return (
@@ -27,6 +28,7 @@ export default function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/abo/success" element={<AboSuccess />} />
+              <Route path="/kontakt" element={<Contact />} />
               <Route path="/datenschutz" element={<Datenschutz />} />
               <Route path="/impressum" element={<Impressum />} />
               <Route path="/spiele" element={
