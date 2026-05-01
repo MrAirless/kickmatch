@@ -137,8 +137,7 @@ export default function GameDetail() {
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 3000); }
 
   async function handleBooking(formData) {
-    await supabase.from("games").update({ status: "gebucht" }).eq("id", id);
-    await supabase.from("buchungen").insert([{
+    const { data: neueBuchung, error: buchungError } = await supabase.from("buchungen").insert([{
       game_id: id,
       anbieter_name: game.trainer_name, anbieter_tel: game.telefon,
       anbieter_verein: game.verein, anbieter_email: game.anbieter_email || "",
@@ -146,7 +145,16 @@ export default function GameDetail() {
       bucher_tel: formData.tel, bucher_mannschaft: formData.mannschaft || null,
       bucher_nachricht: formData.msg || null, bucher_email: session?.user?.email || "",
       datum: formatDate(game.datum), uhrzeit: game.uhrzeit, gelesen: false,
-    }]);
+    }]).select().single();
+    if (buchungError) { alert("Fehler beim Speichern: " + buchungError.message); return; }
+
+    const { error: updateError } = await supabase.from("games").update({ status: "gebucht" }).eq("id", id);
+    if (updateError) {
+      await supabase.from("buchungen").delete().eq("id", neueBuchung.id);
+      alert("Fehler: " + updateError.message);
+      return;
+    }
+
     if (game.anbieter_email) {
       fetch('/api/send-push', {
         method: 'POST',
@@ -159,6 +167,7 @@ export default function GameDetail() {
         }),
       }).catch(() => {})
     }
+    setBuchung(neueBuchung);
     setGame((g) => ({ ...g, status: "gebucht" }));
     setShowBuchung(false);
     showToast("Anfrage erfolgreich gesendet!");
