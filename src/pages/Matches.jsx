@@ -365,12 +365,12 @@ function MeineSpielZeile({ game, onNavigate, onEdit, onOnlineStellen, onDelete }
   const isGebucht = game.status === "gebucht";
 
   return (
-    <div className="flex items-center gap-3 py-3.5 px-4 border-b border-gray-100 last:border-0">
+    <div className={`flex items-center gap-3 py-3.5 px-4 border-b border-gray-100 last:border-0 ${isGebucht ? "bg-green-50" : ""}`}>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
           <span className="text-xs text-gray-500">{formatDate(game.datum)} · {game.uhrzeit} Uhr</span>
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isGebucht ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700"}`}>
-            {isGebucht ? "Gebucht" : "Offen"}
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${isGebucht ? "bg-green-200 text-green-800" : "bg-green-100 text-green-700"}`}>
+            {isGebucht ? "✓ Angenommen" : "Offen"}
           </span>
         </div>
         <p className="font-semibold text-gray-900 text-sm truncate">{game.verein}</p>
@@ -431,6 +431,7 @@ function ListeTab({ games, userLocation, laden, onSelectGame }) {
   const heute = new Date().toISOString().slice(0, 10);
   const filtered = games.filter((g) => {
     if (g.datum < heute) return false;
+    if (g.status === "gebucht") return false;
     const m = g.mannschaft || g.jugend || "";
     if (activeFilter === "Alle") return true;
     if (activeFilter === "Angebote") return g.type === "angebot";
@@ -865,19 +866,29 @@ function KalenderAnsicht({ spiele, onSelectGame, onEdit, onOnlineStellen, onDele
           const dateStr = `${jahr}-${String(monat + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
           const tagesSpiele = spieleByDay[dateStr] || [];
           const hatSpiele = tagesSpiele.length > 0;
+          const hatAngenommen = tagesSpiele.some((g) => g.status === "gebucht" || g.buchungStatus === "angenommen");
           const isSelected = selectedDay === day;
           const isHeute = day === heute.getDate() && monat === heute.getMonth() && jahr === heute.getFullYear();
           return (
             <button key={day} onClick={() => setSelectedDay(isSelected ? null : day)}
               className={`rounded-lg p-1 text-left w-full transition-colors
-                ${isSelected ? "bg-brand-600 text-white" : hatSpiele ? "bg-brand-50 text-brand-900 hover:bg-brand-100" : "text-gray-700 hover:bg-gray-50"}
+                ${isSelected ? "bg-brand-600 text-white" :
+                  hatAngenommen ? "bg-green-100 text-green-900 hover:bg-green-200" :
+                  hatSpiele ? "bg-brand-50 text-brand-900 hover:bg-brand-100" :
+                  "text-gray-700 hover:bg-gray-50"}
                 ${isHeute && !isSelected ? "ring-2 ring-brand-400 ring-inset" : ""}`}>
               <div className={`text-xs font-semibold leading-none mb-1 ${hatSpiele ? "" : "text-center py-2"}`}>{day}</div>
-              {tagesSpiele.slice(0, 2).map((g, idx) => (
-                <div key={idx} className={`text-[10px] leading-tight truncate rounded px-0.5 mb-0.5 ${isSelected ? "text-white/90" : "text-brand-700 bg-brand-100"}`}>
-                  {g.uhrzeit?.slice(0, 5)} {g.mannschaft?.split(" ")[0]}
-                </div>
-              ))}
+              {tagesSpiele.slice(0, 2).map((g, idx) => {
+                const istGebucht = g.status === "gebucht" || g.buchungStatus === "angenommen";
+                return (
+                  <div key={idx} className={`text-[10px] leading-tight truncate rounded px-0.5 mb-0.5 font-medium
+                    ${isSelected ? "text-white/90" :
+                      istGebucht ? "text-green-800 bg-green-200" :
+                      "text-brand-700 bg-brand-100"}`}>
+                    {istGebucht ? "✓ " : ""}{g.uhrzeit?.slice(0, 5)} {g.mannschaft?.split(" ")[0]}
+                  </div>
+                );
+              })}
               {tagesSpiele.length > 2 && (
                 <div className={`text-[10px] leading-tight ${isSelected ? "text-white/70" : "text-brand-400"}`}>+{tagesSpiele.length - 2}</div>
               )}
@@ -969,7 +980,12 @@ function MeineTab({ userLocation, onSelectGame, session, onEdit, onOnlineStellen
   }
 
   const sortierteEigene = [...eigeneSpiele].sort((a, b) => a.datum.localeCompare(b.datum));
-  const sortierteAnfragen = [...buchungsSpiele].sort((a, b) => a.datum.localeCompare(b.datum));
+  const sortierteAnfragen = [...buchungsSpiele]
+    .sort((a, b) => a.datum.localeCompare(b.datum))
+    .map((g) => {
+      const buchung = meineBuchungen.find((b) => b.game_id === g.id);
+      return { ...g, buchungStatus: buchung?.status };
+    });
   const alleSpiele = [...sortierteEigene, ...sortierteAnfragen].sort((a, b) => a.datum.localeCompare(b.datum));
 
   return (
