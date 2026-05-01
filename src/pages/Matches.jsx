@@ -421,7 +421,9 @@ function ListeTab({ games, userLocation, laden, onSelectGame }) {
   const [activeFilter, setActiveFilter] = useState("Alle");
   const [sortBy, setSortBy] = useState("neu");
 
+  const heute = new Date().toISOString().slice(0, 10);
   const filtered = games.filter((g) => {
+    if (g.datum < heute) return false;
     const m = g.mannschaft || g.jugend || "";
     if (activeFilter === "Alle") return true;
     if (activeFilter === "Angebote") return g.type === "angebot";
