@@ -1023,6 +1023,9 @@ function MeineTab({ userLocation, onSelectGame, session, onEdit, onOnlineStellen
               Meine Anfragen ({sortierteAnfragen.length})
             </button>
           </div>
+          {activeSection === "anfragen" && (
+            <button onClick={ladeBuchungen} className="text-xs text-brand-600 hover:underline mb-3 block">↻ Aktualisieren</button>
+          )}
 
           {activeSection === "eigene" && (
             ladenEigene ? (
@@ -1190,8 +1193,24 @@ export default function Matches() {
   }
 
   async function handleSpieleOnline(gameId) {
+    const { data: aktuelleBuchungen } = await supabase.from("buchungen").select("*").eq("game_id", gameId);
     const { error } = await supabase.from("games").update({ status: "offen" }).eq("id", gameId);
     if (error) { alert("Fehler: " + error.message); return; }
+    await supabase.from("buchungen").update({ status: "angefragt" }).eq("game_id", gameId);
+    if (aktuelleBuchungen) {
+      aktuelleBuchungen.filter((b) => b.status === "angenommen" && b.bucher_email).forEach((b) => {
+        fetch('/api/send-push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userEmail: b.bucher_email,
+            title: 'Spiel wieder offen – KickMatch',
+            body: `Das Spiel am ${b.datum} wurde erneut ausgeschrieben. Deine Anfrage ist weiterhin aktiv.`,
+            url: `/spiele/${gameId}`,
+          }),
+        }).catch(() => {});
+      });
+    }
     setGames((prev) => prev.map((g) => g.id === gameId ? { ...g, status: "offen" } : g));
     showToast("Spiel wieder online gestellt!");
   }
