@@ -10,6 +10,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Profile from './pages/Profile'
 import Matches from './pages/Matches'
+import GameDetail from './pages/GameDetail'
 import AboSuccess from './pages/AboSuccess'
 import Datenschutz from './pages/Datenschutz'
 import Impressum from './pages/Impressum'
@@ -33,6 +34,9 @@ export default function App() {
               <Route path="/impressum" element={<Impressum />} />
               <Route path="/spiele" element={
                 <ProtectedRoute><Matches /></ProtectedRoute>
+              } />
+              <Route path="/spiele/:id" element={
+                <ProtectedRoute><GameDetail /></ProtectedRoute>
               } />
               <Route path="/profil" element={
                 <ProtectedRoute><Profile /></ProtectedRoute>
