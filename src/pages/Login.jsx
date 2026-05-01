@@ -1,10 +1,11 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
   const { signIn } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -19,7 +20,7 @@ export default function Login() {
     if (error) {
       setError('E-Mail oder Passwort falsch.')
     } else {
-      navigate('/spiele')
+      navigate(location.state?.from || '/spiele')
     }
   }
 

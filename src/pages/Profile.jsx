@@ -196,6 +196,18 @@ export default function Profile() {
         </div>
       )}
 
+      {user?.email === 'erles@gyhe.de' && (
+        <div className="card mt-5">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="font-semibold text-gray-900">Admin</h2>
+              <p className="text-sm text-gray-400 mt-0.5">Links erstellen & Vereine verwalten</p>
+            </div>
+            <Link to="/admin" className="btn-secondary text-sm">Öffnen →</Link>
+          </div>
+        </div>
+      )}
+
       <div className="card mt-5">
         <h2 className="font-semibold text-gray-900 mb-4">Mein Abo</h2>
         {subscription ? (
