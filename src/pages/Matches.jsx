@@ -979,9 +979,9 @@ export default function Matches() {
       anbieter_email: session.user.email,
     }]).select();
     if (error) { alert("Fehler: " + error.message); return; }
-    if (data) setGames((prev) => [data[0], ...prev]);
+    await ladeSpiele();
     showToast("Erfolgreich veröffentlicht!");
-    setTab("liste");
+    setTab("meine");
   }
 
   async function handleEditGame(gameId, formData) {
