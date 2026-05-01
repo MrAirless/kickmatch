@@ -13,6 +13,8 @@ export default function Profile() {
   const [clubName, setClubName] = useState(profile?.club_name || '')
   const [city, setCity] = useState(profile?.city || '')
   const [phone, setPhone] = useState(profile?.phone || '')
+  const [heimplatz, setHeimplatz] = useState(profile?.heimplatz || '')
+  const [heimplatzAdresse, setHeimplatzAdresse] = useState(profile?.heimplatz_adresse || '')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
@@ -40,6 +42,8 @@ export default function Profile() {
     setClubName(profile?.club_name || '')
     setCity(profile?.city || '')
     setPhone(profile?.phone || '')
+    setHeimplatz(profile?.heimplatz || '')
+    setHeimplatzAdresse(profile?.heimplatz_adresse || '')
     setEditing(true)
     setSuccess(false)
     setError('')
@@ -51,7 +55,7 @@ export default function Profile() {
     setLoading(true)
     const { error } = await supabase
       .from('profiles')
-      .update({ full_name: fullName, club_name: clubName, city, phone })
+      .update({ full_name: fullName, club_name: clubName, city, phone, heimplatz, heimplatz_adresse: heimplatzAdresse })
       .eq('id', user.id)
     setLoading(false)
     if (error) {
@@ -112,6 +116,19 @@ export default function Profile() {
               <label className="label">Telefon</label>
               <input type="tel" className="input" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="z.B. 0171 1234567" />
             </div>
+            <div className="pt-2 pb-1">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Heimplatz</p>
+              <div className="space-y-3">
+                <div>
+                  <label className="label">Platzname</label>
+                  <input type="text" className="input" value={heimplatz} onChange={(e) => setHeimplatz(e.target.value)} placeholder="z.B. Sportpark Nord" />
+                </div>
+                <div>
+                  <label className="label">Adresse</label>
+                  <input type="text" className="input" value={heimplatzAdresse} onChange={(e) => setHeimplatzAdresse(e.target.value)} placeholder="Musterstr. 1, 68159 Mannheim" />
+                </div>
+              </div>
+            </div>
             <div className="flex gap-3 pt-2">
               <button type="submit" disabled={loading} className="btn-primary">
                 {loading ? 'Wird gespeichert…' : 'Speichern'}
@@ -140,6 +157,25 @@ export default function Profile() {
                 <span className="text-gray-500">E-Mail</span>
                 <span className="font-medium text-gray-900">{user?.email}</span>
               </div>
+              {(profile?.heimplatz || profile?.heimplatz_adresse) && (
+                <>
+                  <div className="pt-3 pb-1">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Heimplatz</p>
+                  </div>
+                  {profile?.heimplatz && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Platz</span>
+                      <span className="font-medium text-gray-900">{profile.heimplatz}</span>
+                    </div>
+                  )}
+                  {profile?.heimplatz_adresse && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Adresse</span>
+                      <span className="font-medium text-gray-900">{profile.heimplatz_adresse}</span>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
             <button onClick={startEditing} className="btn-secondary text-sm mt-6 w-full">
               Profil bearbeiten

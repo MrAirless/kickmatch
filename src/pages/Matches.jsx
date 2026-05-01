@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { useAuth } from "../context/AuthContext";
 import {
   MANNSCHAFTEN, SPIELFELD_GROESSEN, SCHIRI_LIZENZEN,
   formatDate, haversine, getKategorie, kategorieColor,
@@ -466,13 +467,31 @@ function ListeTab({ games, userLocation, laden, onSelectGame }) {
 }
 
 function EintragenTab({ onSubmit }) {
+  const { profile } = useAuth();
   const [type, setType] = useState("angebot");
   const [mannschaft, setMannschaft] = useState("E-Jugend (U10)");
   const [staerke, setStaerke] = useState(3);
   const [umkreis, setUmkreis] = useState(30);
   const [schiriBenoetigt, setSchiriBenoetigt] = useState(false);
   const [laden, setLaden] = useState(false);
-  const [form, setForm] = useState({ datum: "", uhrzeit: "10:00", rasen: "Naturrasen", platz: "", adresse: "", trainer_name: "", telefon: "", verein: "", spielfeld_groesse: "", spieldauer: "", wichtige_infos: "" });
+  const [form, setForm] = useState({
+    datum: "", uhrzeit: "10:00", rasen: "Naturrasen",
+    platz: "", adresse: "", trainer_name: "", telefon: "", verein: "",
+    spielfeld_groesse: "", spieldauer: "", wichtige_infos: "",
+  });
+  const profileApplied = useRef(false);
+  useEffect(() => {
+    if (!profile || profileApplied.current) return;
+    profileApplied.current = true;
+    setForm((f) => ({
+      ...f,
+      trainer_name: profile.full_name || "",
+      telefon: profile.phone || "",
+      verein: profile.club_name || "",
+      platz: profile.heimplatz || "",
+      adresse: profile.heimplatz_adresse || "",
+    }));
+  }, [profile]);
 
   function set(key, val) { setForm((f) => ({ ...f, [key]: val })); }
 
@@ -480,7 +499,8 @@ function EintragenTab({ onSubmit }) {
     if (!form.datum || !form.trainer_name || !form.verein) { alert("Bitte Datum, Name und Verein ausfüllen."); return; }
     setLaden(true);
     await onSubmit({ ...form, type, mannschaft, staerke, umkreis_km: type === "anfrage" ? umkreis : null, schiri_benoetigt: schiriBenoetigt, schiri_status: schiriBenoetigt ? "offen" : null });
-    setForm({ datum: "", uhrzeit: "10:00", rasen: "Naturrasen", platz: "", adresse: "", trainer_name: "", telefon: "", verein: "", spielfeld_groesse: "", spieldauer: "", wichtige_infos: "" });
+    setForm({ datum: "", uhrzeit: "10:00", rasen: "Naturrasen", platz: profile?.heimplatz || "", adresse: profile?.heimplatz_adresse || "", trainer_name: profile?.full_name || "", telefon: profile?.phone || "", verein: profile?.club_name || "", spielfeld_groesse: "", spieldauer: "", wichtige_infos: "" });
+    profileApplied.current = false;
     setType("angebot"); setMannschaft("E-Jugend (U10)"); setStaerke(3); setUmkreis(30); setSchiriBenoetigt(false);
     setLaden(false);
   }
@@ -608,7 +628,12 @@ function EintragenTab({ onSubmit }) {
       </div>
 
       <div className="card space-y-3">
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Trainer & Verein</p>
+        <div className="flex items-center gap-2">
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Trainer & Verein</p>
+          {(profile?.full_name || profile?.club_name || profile?.phone) && (
+            <span className="text-xs bg-brand-50 text-brand-700 px-2 py-0.5 rounded-full font-medium">aus Profil</span>
+          )}
+        </div>
         <div className="grid grid-cols-2 gap-3">
           <div><label className="label">Name</label><input type="text" className="input" placeholder="Vor- Nachname" value={form.trainer_name} onChange={(e) => set("trainer_name", e.target.value)} /></div>
           <div><label className="label">Telefon</label><input type="tel" className="input" placeholder="+49 …" value={form.telefon} onChange={(e) => set("telefon", e.target.value)} /></div>
@@ -780,11 +805,99 @@ function SucheTab({ games, userLocation, onSelectGame }) {
   );
 }
 
+function KalenderAnsicht({ spiele, onSelectGame, onEdit, onOnlineStellen, onDelete }) {
+  const heute = new Date();
+  const [monat, setMonat] = useState(heute.getMonth());
+  const [jahr, setJahr] = useState(heute.getFullYear());
+  const [selectedDay, setSelectedDay] = useState(null);
+
+  const spieleByDay = {};
+  spiele.forEach((g) => {
+    if (!spieleByDay[g.datum]) spieleByDay[g.datum] = [];
+    spieleByDay[g.datum].push(g);
+  });
+
+  const ersterTag = new Date(jahr, monat, 1);
+  const letzterTag = new Date(jahr, monat + 1, 0);
+  const startOffset = (ersterTag.getDay() + 6) % 7;
+
+  const days = [];
+  for (let i = 0; i < startOffset; i++) days.push(null);
+  for (let d = 1; d <= letzterTag.getDate(); d++) days.push(d);
+
+  const monatName = new Date(jahr, monat, 1).toLocaleDateString("de-DE", { month: "long", year: "numeric" });
+
+  function prevMonat() {
+    if (monat === 0) { setMonat(11); setJahr((y) => y - 1); } else setMonat((m) => m - 1);
+    setSelectedDay(null);
+  }
+  function nextMonat() {
+    if (monat === 11) { setMonat(0); setJahr((y) => y + 1); } else setMonat((m) => m + 1);
+    setSelectedDay(null);
+  }
+
+  const selectedDateStr = selectedDay
+    ? `${jahr}-${String(monat + 1).padStart(2, "0")}-${String(selectedDay).padStart(2, "0")}`
+    : null;
+  const selectedSpiele = selectedDateStr ? (spieleByDay[selectedDateStr] || []) : [];
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 p-4">
+      <div className="flex items-center justify-between mb-3">
+        <button onClick={prevMonat} className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 text-lg font-light">‹</button>
+        <span className="font-semibold text-gray-900 capitalize text-sm">{monatName}</span>
+        <button onClick={nextMonat} className="w-8 h-8 rounded-full flex items-center justify-center text-gray-500 hover:bg-gray-100 text-lg font-light">›</button>
+      </div>
+      <div className="grid grid-cols-7 mb-1">
+        {["Mo", "Di", "Mi", "Do", "Fr", "Sa", "So"].map((d) => (
+          <div key={d} className="text-center text-xs font-semibold text-gray-400 py-1">{d}</div>
+        ))}
+      </div>
+      <div className="grid grid-cols-7 gap-0.5">
+        {days.map((day, i) => {
+          if (!day) return <div key={`e${i}`} />;
+          const dateStr = `${jahr}-${String(monat + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+          const hatSpiele = !!spieleByDay[dateStr];
+          const isSelected = selectedDay === day;
+          const isHeute = day === heute.getDate() && monat === heute.getMonth() && jahr === heute.getFullYear();
+          return (
+            <button key={day} onClick={() => setSelectedDay(isSelected ? null : day)}
+              className={`relative h-9 rounded-lg text-sm font-medium transition-colors
+                ${isSelected ? "bg-brand-600 text-white" : hatSpiele ? "bg-brand-50 text-brand-900 hover:bg-brand-100" : "text-gray-700 hover:bg-gray-50"}
+                ${isHeute && !isSelected ? "ring-2 ring-brand-400 ring-inset" : ""}`}>
+              {day}
+              {hatSpiele && !isSelected && (
+                <span className="absolute bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-brand-500" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+      {selectedDay && (
+        <div className="mt-4 border-t border-gray-100 pt-3">
+          {selectedSpiele.length === 0 ? (
+            <p className="text-sm text-gray-400 text-center py-3">Keine Spiele an diesem Tag</p>
+          ) : (
+            <div className="divide-y divide-gray-100">
+              {selectedSpiele.map((g) => (
+                <MeineSpielZeile key={g.id} game={g}
+                  onNavigate={onSelectGame} onEdit={onEdit}
+                  onOnlineStellen={onOnlineStellen} onDelete={onDelete} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function MeineTab({ userLocation, onSelectGame, session, allGames, onEdit, onOnlineStellen, onDelete, onEintragen }) {
   const [meineBuchungen, setMeineBuchungen] = useState([]);
   const [buchungsSpiele, setBuchungsSpiele] = useState([]);
   const [laden, setLaden] = useState(true);
   const [activeSection, setActiveSection] = useState("eigene");
+  const [viewMode, setViewMode] = useState("liste");
 
   useEffect(() => {
     async function ladeBuchungen() {
@@ -810,55 +923,77 @@ function MeineTab({ userLocation, onSelectGame, session, allGames, onEdit, onOnl
     </div>
   );
 
+  const alleSpiele = [...eigeneSpiele, ...sortierteAnfragen].sort((a, b) => a.datum.localeCompare(b.datum));
+
   return (
     <div>
       <div className="flex items-center justify-between mb-5">
         <h2 className="text-xl font-bold text-gray-900">Meine Spiele</h2>
-        <button onClick={onEintragen} className="btn-primary text-sm">+ Eintragen</button>
+        <div className="flex items-center gap-2">
+          <div className="flex bg-gray-100 rounded-xl p-1">
+            <button onClick={() => setViewMode("liste")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${viewMode === "liste" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}>
+              Liste
+            </button>
+            <button onClick={() => setViewMode("kalender")}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${viewMode === "kalender" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}>
+              Kalender
+            </button>
+          </div>
+          <button onClick={onEintragen} className="btn-primary text-sm">+ Eintragen</button>
+        </div>
       </div>
 
-      <div className="flex mb-5 bg-gray-100 rounded-xl p-1">
-        <button onClick={() => setActiveSection("eigene")}
-          className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${activeSection === "eigene" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}>
-          Ausgeschrieben ({eigeneSpiele.length})
-        </button>
-        <button onClick={() => setActiveSection("anfragen")}
-          className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${activeSection === "anfragen" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}>
-          Meine Anfragen ({sortierteAnfragen.length})
-        </button>
-      </div>
+      {viewMode === "kalender" ? (
+        <KalenderAnsicht spiele={alleSpiele}
+          onSelectGame={onSelectGame} onEdit={onEdit}
+          onOnlineStellen={onOnlineStellen} onDelete={onDelete} />
+      ) : (
+        <>
+          <div className="flex mb-5 bg-gray-100 rounded-xl p-1">
+            <button onClick={() => setActiveSection("eigene")}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${activeSection === "eigene" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}>
+              Ausgeschrieben ({eigeneSpiele.length})
+            </button>
+            <button onClick={() => setActiveSection("anfragen")}
+              className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${activeSection === "anfragen" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}>
+              Meine Anfragen ({sortierteAnfragen.length})
+            </button>
+          </div>
 
-      {activeSection === "eigene" && (
-        eigeneSpiele.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 text-center py-16 text-gray-400">
-            <p className="text-base mb-1">Noch keine Spiele</p>
-            <p className="text-sm">Erstelle dein erstes Spiel mit „+ Eintragen"</p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            {eigeneSpiele.map((g) => (
-              <MeineSpielZeile key={g.id} game={g}
-                onNavigate={onSelectGame} onEdit={onEdit}
-                onOnlineStellen={onOnlineStellen} onDelete={onDelete} />
-            ))}
-          </div>
-        )
-      )}
+          {activeSection === "eigene" && (
+            eigeneSpiele.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-200 text-center py-16 text-gray-400">
+                <p className="text-base mb-1">Noch keine Spiele</p>
+                <p className="text-sm">Erstelle dein erstes Spiel mit „+ Eintragen"</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                {eigeneSpiele.map((g) => (
+                  <MeineSpielZeile key={g.id} game={g}
+                    onNavigate={onSelectGame} onEdit={onEdit}
+                    onOnlineStellen={onOnlineStellen} onDelete={onDelete} />
+                ))}
+              </div>
+            )
+          )}
 
-      {activeSection === "anfragen" && (
-        sortierteAnfragen.length === 0 ? (
-          <div className="bg-white rounded-xl border border-gray-200 text-center py-16 text-gray-400">
-            <p className="text-base mb-1">Keine Anfragen</p>
-            <p className="text-sm">Finde ein Spiel im Tab „Spiele"</p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-            {sortierteAnfragen.map((g) => {
-              const buchung = meineBuchungen.find((b) => b.game_id === g.id);
-              return <AnfrageZeile key={g.id} game={g} buchung={buchung} onNavigate={onSelectGame} />;
-            })}
-          </div>
-        )
+          {activeSection === "anfragen" && (
+            sortierteAnfragen.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-200 text-center py-16 text-gray-400">
+                <p className="text-base mb-1">Keine Anfragen</p>
+                <p className="text-sm">Finde ein Spiel im Tab „Spiele"</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                {sortierteAnfragen.map((g) => {
+                  const buchung = meineBuchungen.find((b) => b.game_id === g.id);
+                  return <AnfrageZeile key={g.id} game={g} buchung={buchung} onNavigate={onSelectGame} />;
+                })}
+              </div>
+            )
+          )}
+        </>
       )}
     </div>
   );
@@ -881,6 +1016,32 @@ export default function Matches() {
 
   const rolle = session?.user?.user_metadata?.rolle || "trainer";
   const istSchiri = rolle === "schiedsrichter";
+
+  const pullStartY = useRef(0);
+  const [pullProgress, setPullProgress] = useState(0); // 0–1
+  const [refreshing, setRefreshing] = useState(false);
+  const PULL_THRESHOLD = 70;
+
+  function handleTouchStart(e) {
+    if (window.scrollY === 0) pullStartY.current = e.touches[0].clientY;
+    else pullStartY.current = 0;
+  }
+
+  function handleTouchMove(e) {
+    if (!pullStartY.current) return;
+    const delta = e.touches[0].clientY - pullStartY.current;
+    if (delta > 0) setPullProgress(Math.min(delta / PULL_THRESHOLD, 1));
+  }
+
+  async function handleTouchEnd() {
+    if (pullProgress >= 1 && !refreshing) {
+      setRefreshing(true);
+      await ladeSpiele();
+      setRefreshing(false);
+    }
+    setPullProgress(0);
+    pullStartY.current = 0;
+  }
 
   function setTab(tab) { tab === "liste" ? setSearchParams({}) : setSearchParams({ tab }); }
 
@@ -965,7 +1126,20 @@ export default function Matches() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-8">
+    <div
+      className="max-w-5xl mx-auto px-4 py-8"
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+    >
+      {(pullProgress > 0 || refreshing) && (
+        <div className="flex justify-center -mt-6 mb-2" style={{ opacity: refreshing ? 1 : pullProgress }}>
+          <div
+            className={`w-8 h-8 rounded-full border-2 border-brand-600 border-t-transparent ${refreshing ? "animate-spin" : ""}`}
+            style={{ transform: refreshing ? undefined : `rotate(${pullProgress * 270}deg)` }}
+          />
+        </div>
+      )}
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold text-gray-900">{TAB_TITLES[activeTab] || "Spiele"}</h1>
         <button onClick={() => setShowStandortModal(true)}
