@@ -489,165 +489,166 @@ function SchiriAnfragenModal({ game, onClose, onBestaetigen }) {
 
 function DetailModal({ game, userLocation, session, onClose, onBook, onRefresh, onEdit, onOnlineStellen }) {
   const [showSchiriAnfragen, setShowSchiriAnfragen] = useState(false);
+  const [anfragen, setAnfragen] = useState([]);
   if (!game) return null;
   const dist = userLocation && game.lat && game.lng ? haversine(userLocation.lat, userLocation.lng, game.lat, game.lng) : null;
   const mannschaft = game.mannschaft || game.jugend || "";
-  const kat = getKategorie(mannschaft);
-  const c = kategorieColor(kat);
   const mapsUrl = game.adresse ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.adresse)}` : null;
   const istSchiri = session?.user?.user_metadata?.rolle === "schiedsrichter";
   const isOffer = game.type === "angebot";
   const istEigenesSpiel = session?.user?.email && game.anbieter_email === session.user.email;
 
-  const headerBg = isOffer
-    ? "linear-gradient(135deg, #1D9E75 0%, #0f7a58 100%)"
-    : "linear-gradient(135deg, #534AB7 0%, #3a32a0 100%)";
+  useEffect(() => {
+    if (!istEigenesSpiel) return;
+    supabase.from("buchungen").select("*").eq("game_id", game.id)
+      .then(({ data }) => { if (data) setAnfragen(data); });
+  }, [game.id, istEigenesSpiel]);
+
+  function InfoRow({ label, value, valueClass = "" }) {
+    return (
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 last:border-0">
+        <span className="text-sm text-gray-500">{label}</span>
+        <span className={`text-sm font-medium text-gray-900 text-right ml-4 ${valueClass}`}>{value}</span>
+      </div>
+    );
+  }
 
   return (
     <>
-      <div onClick={onClose} className="fixed inset-0 bg-black/60 flex items-end justify-center z-50 sm:items-center sm:p-4">
-        <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-md max-h-[92vh] overflow-y-auto shadow-2xl">
+      <div onClick={onClose} className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 sm:items-center sm:p-4">
+        <div onClick={(e) => e.stopPropagation()} className="rounded-t-3xl sm:rounded-2xl w-full max-w-xl max-h-[92vh] overflow-y-auto shadow-2xl" style={{ background: "#f4f4f5" }}>
 
-          {/* Farbiger Header */}
-          <div className="relative" style={{ background: headerBg }}>
-            <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/20 text-white text-sm hover:bg-white/30 transition-colors">✕</button>
-            <div className="px-6 pt-6 pb-7">
-              <div className="flex gap-1.5 flex-wrap mb-3">
-                <span className="bg-white/20 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
-                  {isOffer ? "⚽ Angebot" : "🔍 Anfrage"}
+          {/* Header */}
+          <div className="bg-white px-6 pt-6 pb-5 rounded-t-3xl sm:rounded-t-2xl relative">
+            <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 text-gray-500 hover:bg-gray-200 text-sm transition-colors">✕</button>
+            <div className="pr-10">
+              <div className="flex items-start justify-between gap-2 mb-1">
+                <h2 className="text-2xl font-bold text-gray-900 leading-tight">{game.verein}</h2>
+                <span className={`text-sm font-semibold flex-shrink-0 mt-1 ${game.status === "gebucht" ? "text-red-500" : "text-brand-600"}`}>
+                  {game.status === "gebucht" ? "Gebucht" : "Offen"}
                 </span>
-                {kat && <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: c.bg, color: c.text }}>{kat}</span>}
-                {game.status === "gebucht" && <span className="bg-red-500 text-white text-xs font-semibold px-2.5 py-1 rounded-full">Gebucht</span>}
               </div>
-              <h2 className="text-2xl font-bold text-white mb-0.5">{game.verein}</h2>
-              <p className="text-white/75 font-medium text-sm">{mannschaft}</p>
-              <div className="flex gap-5 mt-5">
-                <div>
-                  <p className="text-white/60 text-xs uppercase tracking-wide font-semibold">Datum</p>
-                  <p className="text-white font-bold text-base mt-0.5">{formatDate(game.datum)}</p>
-                </div>
-                <div className="w-px bg-white/25" />
-                <div>
-                  <p className="text-white/60 text-xs uppercase tracking-wide font-semibold">Uhrzeit</p>
-                  <p className="text-white font-bold text-base mt-0.5">{game.uhrzeit} Uhr</p>
-                </div>
-                {dist !== null && (
-                  <>
-                    <div className="w-px bg-white/25" />
-                    <div>
-                      <p className="text-white/60 text-xs uppercase tracking-wide font-semibold">Entfernung</p>
-                      <p className="text-white font-bold text-base mt-0.5">{dist} km</p>
-                    </div>
-                  </>
-                )}
-              </div>
+              <p className="text-gray-500 text-sm">
+                {mannschaft}{dist !== null ? ` · ${dist} km entfernt` : ""}
+              </p>
             </div>
           </div>
 
-          <div className="p-5 space-y-3">
+          <div className="p-4 space-y-3">
+
+            {/* Spieldetails */}
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <InfoRow label="Datum" value={formatDate(game.datum)} />
+              <InfoRow label="Anpfiff" value={`${game.uhrzeit} Uhr`} />
+              <InfoRow label="Mannschaft" value={mannschaft} />
+              <InfoRow label="Typ" value={isOffer ? "Spiel anbieten" : "Spiel suchen"} />
+              <InfoRow label="Rasenart" value={game.rasen} />
+              {game.spielfeld_groesse && <InfoRow label="Spielfeld" value={game.spielfeld_groesse} />}
+              {game.spieldauer && <InfoRow label="Spieldauer" value={`${game.spieldauer} Minuten`} />}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                <span className="text-sm text-gray-500">Spielstärke</span>
+                <div className="flex items-center gap-2">
+                  <StrengthDots value={game.staerke} />
+                  <span className="text-sm text-gray-400">({game.staerke}/5)</span>
+                </div>
+              </div>
+              <InfoRow label="Trainer" value={game.trainer_name} />
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="text-sm text-gray-500">Telefon</span>
+                <a href={`tel:${game.telefon}`} className="text-sm font-medium text-brand-600 hover:underline">{game.telefon}</a>
+              </div>
+            </div>
 
             {/* Spielort */}
-            <div className="bg-gray-50 rounded-2xl p-4 flex gap-3 items-start">
-              <span className="text-lg mt-0.5">📍</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Spielort</p>
-                <p className="font-semibold text-gray-900">{game.platz || "Noch offen"}</p>
-                {game.adresse && <p className="text-sm text-gray-500 mt-0.5 truncate">{game.adresse}</p>}
-              </div>
-              {mapsUrl && (
-                <a href={mapsUrl} target="_blank" rel="noreferrer"
-                  className="flex-shrink-0 flex items-center gap-1.5 bg-brand-600 text-white text-xs font-semibold px-3 py-2 rounded-xl hover:bg-brand-700 transition-colors self-center">
-                  🗺️ Karte
-                </a>
-              )}
-            </div>
-
-            {/* Detail-Raster */}
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="bg-gray-50 rounded-2xl p-3.5">
-                <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Rasen</p>
-                <p className="text-sm font-semibold text-gray-900">🌿 {game.rasen}</p>
-              </div>
-              <div className="bg-gray-50 rounded-2xl p-3.5">
-                <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Spielstärke</p>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <StrengthDots value={game.staerke} />
-                  <span className="text-xs text-gray-400">({game.staerke}/5)</span>
+            {(game.platz || game.adresse) && (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <span className="font-semibold text-gray-900 text-sm">Spielort</span>
+                  {mapsUrl && (
+                    <a href={mapsUrl} target="_blank" rel="noreferrer" className="text-sm text-brand-600 hover:underline font-medium">
+                      Route planen →
+                    </a>
+                  )}
                 </div>
-              </div>
-              {game.spielfeld_groesse && (
-                <div className="bg-gray-50 rounded-2xl p-3.5">
-                  <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Spielfeld</p>
-                  <p className="text-sm font-semibold text-gray-900">⬛ {game.spielfeld_groesse}</p>
-                </div>
-              )}
-              {game.spieldauer && (
-                <div className="bg-gray-50 rounded-2xl p-3.5">
-                  <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Spieldauer</p>
-                  <p className="text-sm font-semibold text-gray-900">⏱️ {game.spieldauer} Min</p>
-                </div>
-              )}
-            </div>
-
-            {/* Kontakt */}
-            <div className="bg-gray-50 rounded-2xl p-4">
-              <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-3">Kontakt</p>
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="font-semibold text-gray-900">{game.trainer_name}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">Trainer</p>
-                </div>
-                <a href={`tel:${game.telefon}`}
-                  className="flex items-center gap-2 bg-brand-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-brand-700 transition-colors flex-shrink-0">
-                  📞 Anrufen
-                </a>
-              </div>
-            </div>
-
-            {/* Schiedsrichter */}
-            {game.schiri_benoetigt && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5">
-                <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-1">🟡 Schiedsrichter</p>
-                <p className="text-sm text-amber-700">
-                  {game.schiri_status === "besetzt" ? "✓ Schiedsrichter ist bestätigt" :
-                    game.schiri_status === "angefragt" ? "Bewerbungen eingegangen — Trainer prüft" :
-                      "Noch kein Schiedsrichter — Bewerbungen willkommen"}
-                </p>
-                {game.schiri_status === "angefragt" && !istSchiri && (
-                  <button onClick={() => setShowSchiriAnfragen(true)} className="mt-2.5 w-full py-2 bg-amber-100 text-amber-800 border border-amber-300 rounded-xl text-xs font-semibold hover:bg-amber-200 transition-colors">
-                    Bewerbungen ansehen
-                  </button>
-                )}
+                {game.platz && <InfoRow label="Name" value={game.platz} />}
+                {game.adresse && <InfoRow label="Adresse" value={game.adresse} />}
               </div>
             )}
 
             {/* Wichtige Infos */}
             {game.wichtige_infos && (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5">
-                <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-2">ℹ️ Wichtige Infos</p>
-                <p className="text-sm text-amber-800 leading-relaxed">{game.wichtige_infos}</p>
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="px-4 py-3 border-b border-gray-100">
+                  <span className="font-semibold text-gray-900 text-sm">Wichtige Infos</span>
+                </div>
+                <p className="px-4 py-3 text-sm text-gray-700 leading-relaxed">{game.wichtige_infos}</p>
               </div>
             )}
 
-            {/* CTA */}
-            {istEigenesSpiel ? (
-              <div className="space-y-2 pt-1">
-                <button onClick={() => { onClose(); onEdit(game); }} className="btn-primary w-full justify-center">
-                  ✏️ Spiel bearbeiten
-                </button>
-                {game.status === "gebucht" && (
-                  <button onClick={() => { onOnlineStellen(game.id); onClose(); }}
-                    className="w-full py-3 bg-brand-50 text-brand-700 border border-brand-200 rounded-xl text-sm font-semibold hover:bg-brand-100 transition-colors">
-                    🟢 Wieder online stellen
+            {/* Schiedsrichter */}
+            {game.schiri_benoetigt && (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <span className="font-semibold text-gray-900 text-sm">Schiedsrichter</span>
+                  <span className={`text-sm font-medium ${game.schiri_status === "besetzt" ? "text-brand-600" : "text-amber-600"}`}>
+                    {game.schiri_status === "besetzt" ? "Bestätigt" : game.schiri_status === "angefragt" ? "Bewerbungen eingegangen" : "Gesucht"}
+                  </span>
+                </div>
+                {game.schiri_status === "angefragt" && !istSchiri && (
+                  <button onClick={() => setShowSchiriAnfragen(true)} className="w-full px-4 py-3 text-sm text-amber-700 font-medium text-left hover:bg-amber-50 transition-colors">
+                    Bewerbungen ansehen →
                   </button>
                 )}
               </div>
-            ) : game.status !== "gebucht" ? (
-              <button onClick={() => { onClose(); onBook(game); }} className="btn-primary w-full justify-center !py-3.5 text-base">
-                ⚡ Spiel jetzt annehmen
-              </button>
-            ) : (
-              <div className="text-center py-3.5 text-sm text-gray-400 border border-gray-200 rounded-2xl">Bereits vergeben</div>
+            )}
+
+            {/* Anfragen — nur für Ersteller */}
+            {istEigenesSpiel && (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+                  <span className="font-semibold text-gray-900 text-sm">Anfragen ({anfragen.length})</span>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => { onClose(); onEdit(game); }} className="text-sm text-gray-600 border border-gray-300 px-3 py-1 rounded-lg hover:bg-gray-50 transition-colors">
+                      Bearbeiten
+                    </button>
+                    {game.status === "gebucht" ? (
+                      <button onClick={() => { onOnlineStellen(game.id); onClose(); }} className="text-sm text-brand-600 font-medium hover:underline">
+                        Wieder online
+                      </button>
+                    ) : (
+                      <button onClick={() => { onOnlineStellen(game.id); onClose(); }} className="text-sm text-red-500 font-medium hover:underline">
+                        Absagen
+                      </button>
+                    )}
+                  </div>
+                </div>
+                {anfragen.length === 0 ? (
+                  <p className="px-4 py-5 text-sm text-gray-400 text-center">Noch keine Anfragen eingegangen.</p>
+                ) : (
+                  anfragen.map((a, i) => (
+                    <div key={a.id} className={`px-4 py-3 ${i < anfragen.length - 1 ? "border-b border-gray-100" : ""}`}>
+                      <p className="text-sm font-semibold text-gray-900">{a.bucher_name} · {a.bucher_verein}</p>
+                      <p className="text-sm text-gray-500">{a.bucher_mannschaft}</p>
+                      <a href={`tel:${a.bucher_tel}`} className="text-sm text-brand-600 font-medium hover:underline">{a.bucher_tel}</a>
+                      {a.bucher_nachricht && <p className="text-xs text-gray-400 italic mt-0.5">"{a.bucher_nachricht}"</p>}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+
+            {/* CTA für andere Nutzer */}
+            {!istEigenesSpiel && (
+              <div className="pb-2">
+                {game.status !== "gebucht" ? (
+                  <button onClick={() => { onClose(); onBook(game); }}
+                    className="w-full py-3.5 bg-brand-600 text-white rounded-xl text-base font-semibold hover:bg-brand-700 transition-colors">
+                    Spiel anfragen
+                  </button>
+                ) : (
+                  <div className="text-center py-3.5 text-sm text-gray-400 bg-white border border-gray-200 rounded-xl">Bereits vergeben</div>
+                )}
+              </div>
             )}
           </div>
         </div>
