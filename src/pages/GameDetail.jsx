@@ -146,15 +146,9 @@ export default function GameDetail() {
       bucher_tel: formData.tel, bucher_mannschaft: formData.mannschaft || null,
       bucher_nachricht: formData.msg || null, bucher_email: session?.user?.email || "",
       datum: formatDate(game.datum), uhrzeit: game.uhrzeit, gelesen: false,
+      status: "angefragt",
     }]).select().single();
     if (buchungError) { alert("Fehler beim Speichern: " + buchungError.message); return; }
-
-    const { error: updateError } = await supabase.from("games").update({ status: "gebucht" }).eq("id", id);
-    if (updateError) {
-      await supabase.from("buchungen").delete().eq("id", neueBuchung.id);
-      alert("Fehler: " + updateError.message);
-      return;
-    }
 
     if (game.anbieter_email) {
       fetch('/api/send-push', {
@@ -166,12 +160,35 @@ export default function GameDetail() {
           body: `${formData.verein} möchte dein Spiel am ${formatDate(game.datum)} buchen.`,
           url: `/spiele/${id}`,
         }),
-      }).catch(() => {})
+      }).catch(() => {});
     }
     setBuchung(neueBuchung);
-    setGame((g) => ({ ...g, status: "gebucht" }));
     setShowBuchung(false);
     showToast("Anfrage erfolgreich gesendet!");
+  }
+
+  async function handleAnnehmen(anfrage) {
+    await supabase.from("buchungen").update({ status: "angenommen" }).eq("id", anfrage.id);
+    const andereIds = anfragen.filter((a) => a.id !== anfrage.id).map((a) => a.id);
+    if (andereIds.length > 0) {
+      await supabase.from("buchungen").update({ status: "abgelehnt" }).in("id", andereIds);
+    }
+    await supabase.from("games").update({ status: "gebucht" }).eq("id", id);
+    if (anfrage.bucher_email) {
+      fetch('/api/send-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userEmail: anfrage.bucher_email,
+          title: '🎉 Anfrage angenommen – KickMatch',
+          body: `Deine Anfrage für das Spiel am ${anfrage.datum} wurde angenommen!`,
+          url: `/spiele/${id}`,
+        }),
+      }).catch(() => {});
+    }
+    setAnfragen((prev) => prev.map((a) => ({ ...a, status: a.id === anfrage.id ? "angenommen" : "abgelehnt" })));
+    setGame((g) => ({ ...g, status: "gebucht" }));
+    showToast("Anfrage angenommen!");
   }
 
   async function handleEdit(gameId, formData) {
@@ -198,11 +215,8 @@ export default function GameDetail() {
 
   async function handleAblehnen(anfrage) {
     if (!window.confirm(`Anfrage von ${anfrage.bucher_verein} ablehnen?`)) return;
-    await supabase.from("buchungen").delete().eq("id", anfrage.id);
-    await supabase.from("games").update({ status: "offen" }).eq("id", id);
-    setAnfragen((prev) => prev.filter((a) => a.id !== anfrage.id));
-    setGame((g) => ({ ...g, status: "offen" }));
-    setBuchung(null);
+    await supabase.from("buchungen").update({ status: "abgelehnt" }).eq("id", anfrage.id);
+    setAnfragen((prev) => prev.map((a) => a.id === anfrage.id ? { ...a, status: "abgelehnt" } : a));
     showToast("Anfrage abgelehnt.");
   }
 
@@ -228,7 +242,7 @@ export default function GameDetail() {
     (buchung && buchung.anbieter_email === email)
   );
   const istBucher = buchung && email === buchung.bucher_email;
-  const darfChatten = game.status === "gebucht" && (istEigenesSpiel || istBucher);
+  const darfChatten = (istEigenesSpiel && anfragen.length > 0) || !!istBucher;
   const senderName = istEigenesSpiel ? game.trainer_name : buchung?.bucher_name || session?.user?.email || "";
   const mapsUrl = game.adresse ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(game.adresse)}` : null;
 
@@ -320,7 +334,9 @@ export default function GameDetail() {
           {istEigenesSpiel && (
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-                <span className="font-semibold text-gray-900 text-sm">Anfragen ({anfragen.length})</span>
+                <span className="font-semibold text-gray-900 text-sm">
+                  Anfragen ({anfragen.filter((a) => a.status === "angefragt").length} offen)
+                </span>
                 <div className="flex items-center gap-3">
                   <button onClick={() => setShowEdit(true)} className="text-sm text-gray-600 border border-gray-300 px-3 py-1 rounded-lg hover:bg-gray-50 transition-colors">
                     Bearbeiten
@@ -340,21 +356,32 @@ export default function GameDetail() {
                 <p className="px-4 py-6 text-sm text-gray-400 text-center">Noch keine Anfragen eingegangen.</p>
               ) : (
                 anfragen.map((a, i) => (
-                  <div key={a.id} className={`px-4 py-3 ${i < anfragen.length - 1 ? "border-b border-gray-100" : ""}`}>
-                    <div className="flex items-start justify-between gap-3">
+                  <div key={a.id} className={`px-4 py-4 ${i < anfragen.length - 1 ? "border-b border-gray-100" : ""} ${a.status === "angenommen" ? "bg-green-50" : a.status === "abgelehnt" ? "bg-gray-50" : ""}`}>
+                    <div className="flex items-start justify-between gap-3 mb-2">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-900">{a.bucher_name} · {a.bucher_verein}</p>
-                        {a.bucher_mannschaft && <p className="text-sm text-gray-500">{a.bucher_mannschaft}</p>}
+                        {a.bucher_mannschaft && <p className="text-xs text-gray-500">{a.bucher_mannschaft}</p>}
                         <a href={`tel:${a.bucher_tel}`} className="text-sm text-brand-600 font-medium hover:underline">{a.bucher_tel}</a>
-                        {a.bucher_nachricht && <p className="text-xs text-gray-400 italic mt-0.5">"{a.bucher_nachricht}"</p>}
+                        {a.bucher_nachricht && <p className="text-xs text-gray-400 italic mt-1">"{a.bucher_nachricht}"</p>}
                       </div>
-                      <button
-                        onClick={() => handleAblehnen(a)}
-                        className="flex-shrink-0 text-xs text-red-500 font-medium border border-red-200 px-2.5 py-1 rounded-lg hover:bg-red-50 transition-colors"
-                      >
-                        Ablehnen
-                      </button>
+                      <span className={`flex-shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${
+                        a.status === "angenommen" ? "bg-green-100 text-green-700" :
+                        a.status === "abgelehnt" ? "bg-gray-200 text-gray-500" :
+                        "bg-amber-100 text-amber-700"
+                      }`}>
+                        {a.status === "angenommen" ? "✓ Angenommen" : a.status === "abgelehnt" ? "Abgelehnt" : "Offen"}
+                      </span>
                     </div>
+                    {a.status === "angefragt" && game.status !== "gebucht" && (
+                      <div className="flex gap-2 mt-1">
+                        <button onClick={() => handleAblehnen(a)} className="flex-1 py-1.5 text-xs text-red-500 font-medium border border-red-200 rounded-lg hover:bg-red-50 transition-colors">
+                          Ablehnen
+                        </button>
+                        <button onClick={() => handleAnnehmen(a)} className="flex-1 py-1.5 text-xs text-white font-semibold bg-brand-600 rounded-lg hover:bg-brand-700 transition-colors">
+                          ✓ Annehmen
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))
               )}
@@ -369,16 +396,28 @@ export default function GameDetail() {
           {/* CTA für andere Nutzer */}
           {!istEigenesSpiel && (
             <div className="pb-4">
-              {game.status !== "gebucht" ? (
+              {!istBucher && game.status !== "gebucht" ? (
                 <button onClick={() => setShowBuchung(true)}
                   className="w-full py-3.5 bg-brand-600 text-white rounded-xl text-base font-semibold hover:bg-brand-700 transition-colors">
                   Spiel anfragen
                 </button>
-              ) : !istBucher ? (
+              ) : istBucher && buchung?.status === "angenommen" ? (
+                <div className="text-center py-3.5 text-sm font-semibold text-green-700 bg-green-50 border border-green-200 rounded-xl">
+                  🎉 Deine Anfrage wurde angenommen!
+                </div>
+              ) : istBucher && buchung?.status === "abgelehnt" ? (
+                <div className="text-center py-3.5 text-sm text-gray-400 bg-gray-50 border border-gray-200 rounded-xl">
+                  Anfrage wurde leider abgelehnt
+                </div>
+              ) : istBucher ? (
+                <div className="text-center py-3.5 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl">
+                  ⏳ Anfrage gesendet – du wirst benachrichtigt
+                </div>
+              ) : (
                 <div className="text-center py-3.5 text-sm text-gray-400 bg-white border border-gray-200 rounded-xl">
                   Bereits vergeben
                 </div>
-              ) : null}
+              )}
             </div>
           )}
         </div>

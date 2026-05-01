@@ -239,7 +239,7 @@ function BenachrichtigungenBanner({ session, onNavigateMeine }) {
       </div>
       <div className="flex-1">
         <p className="text-sm font-semibold text-brand-900">
-          {ungelesen.length === 1 ? "1 Spiel wurde angenommen!" : `${ungelesen.length} Spiele wurden angenommen!`}
+          {ungelesen.length === 1 ? "1 neue Anfrage!" : `${ungelesen.length} neue Anfragen!`}
         </p>
         <p className="text-xs text-brand-600">{ungelesen.map((b) => `${b.bucher_verein} · ${b.datum}`).join(" | ")}</p>
       </div>
@@ -399,12 +399,18 @@ function MeineSpielZeile({ game, onNavigate, onEdit, onOnlineStellen, onDelete }
 function AnfrageZeile({ game, buchung, onNavigate }) {
   const mannschaft = game.mannschaft || game.jugend || "";
   const kat = getKategorie(mannschaft);
+  const status = buchung?.status || "angefragt";
+  const badge = status === "angenommen"
+    ? { label: "🎉 Angenommen", cls: "bg-green-100 text-green-700" }
+    : status === "abgelehnt"
+    ? { label: "Abgelehnt", cls: "bg-gray-200 text-gray-500" }
+    : { label: "⏳ Angefragt", cls: "bg-amber-100 text-amber-700" };
   return (
     <div className="flex items-center gap-3 py-3.5 px-4 border-b border-gray-100 last:border-0">
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-0.5">
           <span className="text-xs text-gray-500">{formatDate(game.datum)} · {game.uhrzeit} Uhr</span>
-          <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-700">Gebucht</span>
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
         </div>
         <p className="font-semibold text-gray-900 text-sm truncate">{game.verein}</p>
         <p className="text-xs text-gray-400 truncate">
