@@ -147,6 +147,18 @@ export default function GameDetail() {
       bucher_nachricht: formData.msg || null, bucher_email: session?.user?.email || "",
       datum: formatDate(game.datum), uhrzeit: game.uhrzeit, gelesen: false,
     }]);
+    if (game.anbieter_email) {
+      fetch('/api/send-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userEmail: game.anbieter_email,
+          title: 'Neue Anfrage – KickMatch',
+          body: `${formData.verein} möchte dein Spiel am ${formatDate(game.datum)} buchen.`,
+          url: `/spiele/${id}`,
+        }),
+      }).catch(() => {})
+    }
     setGame((g) => ({ ...g, status: "gebucht" }));
     setShowBuchung(false);
     showToast("Anfrage erfolgreich gesendet!");

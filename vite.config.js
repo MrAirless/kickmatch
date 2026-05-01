@@ -7,6 +7,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       includeAssets: ['logo.png', 'pwa-192.png', 'pwa-512.png'],
       manifest: {
         name: 'KickMatch',

@@ -1,6 +1,8 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import { AuthProvider } from './context/AuthContext'
+import { useAuth } from './context/AuthContext'
+import { subscribeUserToPush } from './lib/pushSubscription'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -17,6 +19,14 @@ const Datenschutz = lazy(() => import('./pages/Datenschutz'))
 const Impressum = lazy(() => import('./pages/Impressum'))
 const Contact = lazy(() => import('./pages/Contact'))
 
+function PushSubscriber() {
+  const { user } = useAuth()
+  useEffect(() => {
+    if (user?.email) subscribeUserToPush(user.email)
+  }, [user?.email])
+  return null
+}
+
 function PageLoader() {
   return (
     <div className="flex justify-center items-center py-32">
@@ -30,6 +40,7 @@ export default function App() {
     <BrowserRouter>
       <AuthProvider>
         <div className="min-h-screen flex flex-col">
+          <PushSubscriber />
           <Navbar />
           <main className="flex-1">
             <Suspense fallback={<PageLoader />}>
