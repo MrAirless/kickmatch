@@ -251,6 +251,14 @@ export default function GameDetail() {
     showToast("Anfrage abgelehnt.");
   }
 
+  useEffect(() => {
+    if (!laden && window.location.hash === '#chat') {
+      setTimeout(() => {
+        document.getElementById('chat')?.scrollIntoView({ behavior: 'smooth' })
+      }, 100)
+    }
+  }, [laden])
+
   if (laden) return (
     <div className="flex justify-center items-center py-32">
       <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
@@ -421,7 +429,9 @@ export default function GameDetail() {
 
           {/* Chat — für beide Parteien wenn Spiel gebucht */}
           {darfChatten && (
-            <ChatBox gameId={id} session={session} senderName={senderName} />
+            <div id="chat">
+              <ChatBox gameId={id} session={session} senderName={senderName} />
+            </div>
           )}
 
           {/* CTA für andere Nutzer */}

@@ -131,7 +131,7 @@ export default function Navbar() {
       setUngelesen((prev) => prev.filter((x) => !(x.id === b.id && x._rolle === b._rolle)))
     }
     setGlockeOffen(false)
-    window.location.href = `/spiele/${b.game_id}`
+    window.location.href = b._rolle === 'chat' ? `/spiele/${b.game_id}#chat` : `/spiele/${b.game_id}`
   }
 
   async function alleGelesen() {
