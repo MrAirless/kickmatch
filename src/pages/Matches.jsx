@@ -898,36 +898,33 @@ function KalenderAnsicht({ spiele, onSelectGame, onEdit, onOnlineStellen, onDele
   );
 }
 
-function MeineTab({ userLocation, onSelectGame, session, allGames, onEdit, onOnlineStellen, onDelete, onEintragen }) {
+function MeineTab({ userLocation, onSelectGame, session, allGames, onRefresh, onEdit, onOnlineStellen, onDelete, onEintragen }) {
   const [meineBuchungen, setMeineBuchungen] = useState([]);
   const [buchungsSpiele, setBuchungsSpiele] = useState([]);
-  const [laden, setLaden] = useState(true);
+  const [ladenBuchungen, setLadenBuchungen] = useState(true);
   const [activeSection, setActiveSection] = useState("eigene");
   const [viewMode, setViewMode] = useState("liste");
 
   useEffect(() => {
-    async function ladeBuchungen() {
-      const { data: buchungen } = await supabase.from("buchungen").select("*").eq("bucher_email", session.user.email);
-      if (!buchungen || buchungen.length === 0) { setLaden(false); return; }
-      const gameIds = buchungen.map((b) => b.game_id);
-      const { data: spiele } = await supabase.from("games").select("*").in("id", gameIds);
-      if (spiele) setBuchungsSpiele(spiele);
-      setMeineBuchungen(buchungen);
-      setLaden(false);
-    }
+    onRefresh();
     ladeBuchungen();
-  }, [session]);
+  }, []);
+
+  async function ladeBuchungen() {
+    setLadenBuchungen(true);
+    const { data: buchungen } = await supabase.from("buchungen").select("*").eq("bucher_email", session.user.email);
+    if (!buchungen || buchungen.length === 0) { setLadenBuchungen(false); return; }
+    const gameIds = buchungen.map((b) => b.game_id);
+    const { data: spiele } = await supabase.from("games").select("*").in("id", gameIds);
+    if (spiele) setBuchungsSpiele(spiele);
+    setMeineBuchungen(buchungen);
+    setLadenBuchungen(false);
+  }
 
   const eigeneSpiele = allGames
     .filter((g) => g.anbieter_email === session.user.email)
     .sort((a, b) => a.datum.localeCompare(b.datum));
   const sortierteAnfragen = buchungsSpiele.sort((a, b) => a.datum.localeCompare(b.datum));
-
-  if (laden) return (
-    <div className="flex justify-center py-16">
-      <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
-    </div>
-  );
 
   const alleSpiele = [...eigeneSpiele, ...sortierteAnfragen].sort((a, b) => a.datum.localeCompare(b.datum));
 
@@ -985,7 +982,11 @@ function MeineTab({ userLocation, onSelectGame, session, allGames, onEdit, onOnl
           )}
 
           {activeSection === "anfragen" && (
-            sortierteAnfragen.length === 0 ? (
+            ladenBuchungen ? (
+              <div className="flex justify-center py-16">
+                <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : sortierteAnfragen.length === 0 ? (
               <div className="bg-white rounded-xl border border-gray-200 text-center py-16 text-gray-400">
                 <p className="text-base mb-1">Keine Anfragen</p>
                 <p className="text-sm">Finde ein Spiel im Tab „Spiele"</p>
@@ -1164,7 +1165,7 @@ export default function Matches() {
       {activeTab === "neu" && !istSchiri && <EintragenTab onSubmit={handleAddGame} />}
       {activeTab === "suche" && <SucheTab games={games} userLocation={userLocation} onSelectGame={(g) => navigate('/spiele/' + g.id)} />}
       {activeTab === "boerse" && <SchiriBörseTab games={games} userLocation={userLocation} session={session} onRefresh={ladeSpiele} />}
-      {activeTab === "meine" && !istSchiri && session && <MeineTab userLocation={userLocation} onSelectGame={(g) => navigate('/spiele/' + g.id)} session={session} allGames={games} onEdit={setEditGame} onOnlineStellen={handleSpieleOnline} onDelete={handleDeleteGame} onEintragen={() => setTab("neu")} />}
+      {activeTab === "meine" && !istSchiri && session && <MeineTab userLocation={userLocation} onSelectGame={(g) => navigate('/spiele/' + g.id)} session={session} allGames={games} onRefresh={ladeSpiele} onEdit={setEditGame} onOnlineStellen={handleSpieleOnline} onDelete={handleDeleteGame} onEintragen={() => setTab("neu")} />}
 
       {editGame && <SpieleEditModal game={editGame} onClose={() => setEditGame(null)} onSave={handleEditGame} />}
       {showStandortModal && <StandortModal onClose={() => setShowStandortModal(false)} onSave={(loc) => { setUserLocation(loc); setShowStandortModal(false); showToast(`Standort: ${loc.label}`); }} />}
