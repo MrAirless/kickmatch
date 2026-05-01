@@ -8,8 +8,22 @@ export default function Navbar() {
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
 
+  const rolle = user?.user_metadata?.rolle || 'trainer'
+  const istSchiri = rolle === 'schiedsrichter'
+
+  const currentTab = location.pathname === '/spiele'
+    ? (new URLSearchParams(location.search).get('tab') || 'liste')
+    : null
+
   const isActive = (path) =>
-    location.pathname === path ? 'text-brand-600 font-medium' : 'text-gray-500 hover:text-gray-900'
+    location.pathname === path && location.pathname !== '/spiele'
+      ? 'text-brand-600 font-medium'
+      : 'text-gray-500 hover:text-gray-900'
+
+  const isTab = (tab) =>
+    currentTab === tab ? 'text-brand-600 font-medium' : 'text-gray-500 hover:text-gray-900'
+
+  const tabHref = (tab) => tab === 'liste' ? '/spiele' : `/spiele?tab=${tab}`
 
   async function handleSignOut() {
     await signOut()
@@ -17,18 +31,34 @@ export default function Navbar() {
     setMenuOpen(false)
   }
 
+  const trainerTabs = [
+    { tab: 'liste', label: 'Spiele' },
+    { tab: 'neu', label: '+ Eintragen' },
+    { tab: 'suche', label: 'Suchen' },
+    { tab: 'boerse', label: '🟡 Schiri-Börse' },
+    { tab: 'meine', label: 'Meine Spiele' },
+  ]
+  const schiriTabs = [
+    { tab: 'liste', label: 'Spiele' },
+    { tab: 'suche', label: 'Suchen' },
+    { tab: 'boerse', label: '🟡 Schiri-Börse' },
+  ]
+  const spieleTabs = istSchiri ? schiriTabs : trainerTabs
+
   return (
     <nav className="bg-white border-b border-gray-100 sticky top-0 z-50">
       <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
 
-        <Link to="/" className="flex items-center gap-2" onClick={() => setMenuOpen(false)}>
+        <Link to="/" className="flex items-center gap-2 flex-shrink-0" onClick={() => setMenuOpen(false)}>
           <img src="/logo.png" alt="KickMatch" className="w-8 h-8 rounded-lg flex-shrink-0" />
           <span className="font-semibold text-gray-900 text-sm">KickMatch</span>
         </Link>
 
         {user ? (
-          <div className="hidden md:flex items-center gap-6 text-sm">
-            <Link to="/spiele" className={isActive('/spiele')}>Spiele</Link>
+          <div className="hidden md:flex items-center gap-5 text-sm">
+            {spieleTabs.map(({ tab, label }) => (
+              <Link key={tab} to={tabHref(tab)} className={isTab(tab)}>{label}</Link>
+            ))}
             <Link to="/preise" className={isActive('/preise')}>Preise</Link>
           </div>
         ) : (
@@ -37,7 +67,7 @@ export default function Navbar() {
           </div>
         )}
 
-        <div className="hidden md:flex items-center gap-2">
+        <div className="hidden md:flex items-center gap-2 flex-shrink-0">
           {user ? (
             <>
               <Link to="/profil" className="btn-ghost text-sm">Profil</Link>
@@ -73,7 +103,9 @@ export default function Navbar() {
         <div className="md:hidden border-t border-gray-100 bg-white px-4 py-4 space-y-1">
           {user ? (
             <>
-              <Link to="/spiele" onClick={() => setMenuOpen(false)} className="block py-2.5 text-sm text-gray-700 hover:text-brand-600">Spiele</Link>
+              {spieleTabs.map(({ tab, label }) => (
+                <Link key={tab} to={tabHref(tab)} onClick={() => setMenuOpen(false)} className="block py-2.5 text-sm text-gray-700 hover:text-brand-600">{label}</Link>
+              ))}
               <Link to="/preise" onClick={() => setMenuOpen(false)} className="block py-2.5 text-sm text-gray-700 hover:text-brand-600">Preise</Link>
               <Link to="/profil" onClick={() => setMenuOpen(false)} className="block py-2.5 text-sm text-gray-700 hover:text-brand-600">Profil</Link>
               <div className="pt-2 border-t border-gray-100">

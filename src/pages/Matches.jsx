@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
 const MANNSCHAFTEN = {
@@ -1043,9 +1044,13 @@ function MeineTab({ userLocation, onSelectGame, session }) {
   );
 }
 
+const TAB_TITLES = { liste: "Spiele", neu: "Spiel eintragen", suche: "Suchen", boerse: "Schiri-Börse", meine: "Meine Spiele" };
+
 export default function Matches() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get("tab") || "liste";
+
   const [session, setSession] = useState(null);
-  const [activeTab, setActiveTab] = useState("liste");
   const [games, setGames] = useState([]);
   const [laden, setLaden] = useState(false);
   const [selectedGame, setSelectedGame] = useState(null);
@@ -1057,9 +1062,7 @@ export default function Matches() {
   const rolle = session?.user?.user_metadata?.rolle || "trainer";
   const istSchiri = rolle === "schiedsrichter";
 
-  const TABS = istSchiri
-    ? [{ id: "liste", label: "Spiele" }, { id: "boerse", label: "🟡 Börse" }, { id: "suche", label: "Suchen" }]
-    : [{ id: "liste", label: "Spiele" }, { id: "neu", label: "+ Eintragen" }, { id: "suche", label: "Suchen" }, { id: "boerse", label: "🟡 Schiri" }, { id: "meine", label: "Meine" }];
+  function setTab(tab) { tab === "liste" ? setSearchParams({}) : setSearchParams({ tab }); }
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => { setSession(session); });
@@ -1091,7 +1094,7 @@ export default function Matches() {
     if (error) { alert("Fehler: " + error.message); return; }
     if (data) setGames((prev) => [data[0], ...prev]);
     showToast("Erfolgreich veröffentlicht!");
-    setActiveTab("liste");
+    setTab("liste");
   }
 
   async function handleConfirmBooking(bookingData) {
@@ -1109,7 +1112,7 @@ export default function Matches() {
     setGames((prev) => prev.map((g) => g.id === bookingGame.id ? { ...g, status: "gebucht" } : g));
     setBookingGame(null);
     showToast("Spiel erfolgreich gebucht!");
-    setActiveTab("meine");
+    setTab("meine");
   }
 
   const currentGame = selectedGame ? games.find((g) => g.id === selectedGame.id) : null;
@@ -1117,41 +1120,18 @@ export default function Matches() {
   return (
     <div className="max-w-5xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Spiele</h1>
-          {userLocation && <p className="text-sm text-brand-600 mt-0.5">📍 {userLocation.label}</p>}
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setShowStandortModal(true)}
-            className={`btn-ghost text-sm ${userLocation ? "text-brand-600" : ""}`}>
-            📍 {userLocation ? userLocation.label : "Standort"}
-          </button>
-          {!istSchiri && (
-            <button onClick={() => setActiveTab("neu")} className="btn-primary text-sm">
-              + Eintragen
-            </button>
-          )}
-        </div>
+        <h1 className="text-2xl font-bold text-gray-900">{TAB_TITLES[activeTab] || "Spiele"}</h1>
+        <button onClick={() => setShowStandortModal(true)}
+          className={`btn-ghost text-sm ${userLocation ? "text-brand-600" : ""}`}>
+          📍 {userLocation ? userLocation.label : "Standort setzen"}
+        </button>
       </div>
 
       {!istSchiri && session && (
-        <BenachrichtigungenBanner session={session} onNavigateMeine={() => setActiveTab("meine")} />
+        <BenachrichtigungenBanner session={session} onNavigateMeine={() => setTab("meine")} />
       )}
 
       <Toast message={toast} />
-
-      <div className="flex border-b border-gray-200 mb-6">
-        {TABS.map((tab) => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${
-              activeTab === tab.id
-                ? "border-brand-600 text-brand-600"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            }`}>
-            {tab.label}
-          </button>
-        ))}
-      </div>
 
       {activeTab === "liste" && <ListeTab games={games} userLocation={userLocation} laden={laden} onSelectGame={setSelectedGame} />}
       {activeTab === "neu" && !istSchiri && <EintragenTab onSubmit={handleAddGame} />}
