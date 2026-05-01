@@ -210,8 +210,23 @@ export default function GameDetail() {
   }
 
   async function handleOnlineStellen() {
+    const { data: aktuelleBuchungen } = await supabase.from("buchungen").select("*").eq("game_id", id);
     await supabase.from("games").update({ status: "offen" }).eq("id", id);
     await supabase.from("buchungen").update({ status: "angefragt" }).eq("game_id", id);
+    if (aktuelleBuchungen) {
+      aktuelleBuchungen.filter((b) => b.status === "angenommen" && b.bucher_email).forEach((b) => {
+        fetch('/api/send-push', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userEmail: b.bucher_email,
+            title: 'Spiel wieder offen – KickMatch',
+            body: `Das Spiel am ${b.datum} wurde erneut ausgeschrieben. Deine Anfrage ist weiterhin aktiv.`,
+            url: `/spiele/${id}`,
+          }),
+        }).catch(() => {});
+      });
+    }
     setGame((g) => ({ ...g, status: "offen" }));
     setAnfragen((prev) => prev.map((a) => ({ ...a, status: "angefragt" })));
     showToast("Spiel wieder online gestellt!");
@@ -220,6 +235,18 @@ export default function GameDetail() {
   async function handleAblehnen(anfrage) {
     if (!window.confirm(`Anfrage von ${anfrage.bucher_verein} ablehnen?`)) return;
     await supabase.from("buchungen").update({ status: "abgelehnt" }).eq("id", anfrage.id);
+    if (anfrage.bucher_email) {
+      fetch('/api/send-push', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userEmail: anfrage.bucher_email,
+          title: 'Anfrage abgelehnt – KickMatch',
+          body: `Deine Anfrage für das Spiel am ${anfrage.datum} wurde leider abgelehnt.`,
+          url: `/spiele/${id}`,
+        }),
+      }).catch(() => {});
+    }
     setAnfragen((prev) => prev.map((a) => a.id === anfrage.id ? { ...a, status: "abgelehnt" } : a));
     showToast("Anfrage abgelehnt.");
   }

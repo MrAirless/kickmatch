@@ -1018,7 +1018,7 @@ function MeineTab({ userLocation, onSelectGame, session, onEdit, onOnlineStellen
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${activeSection === "eigene" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}>
               Ausgeschrieben ({sortierteEigene.length})
             </button>
-            <button onClick={() => setActiveSection("anfragen")}
+            <button onClick={() => { setActiveSection("anfragen"); ladeBuchungen(); }}
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${activeSection === "anfragen" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}>
               Meine Anfragen ({sortierteAnfragen.length})
             </button>
