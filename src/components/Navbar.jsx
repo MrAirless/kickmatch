@@ -123,11 +123,8 @@ export default function Navbar() {
   async function handleNotificationClick(b) {
     if (b._rolle === 'chat') {
       chatAlsGelesenMarkieren(b.game_id)
-    } else if (b._rolle === 'anbieter') {
-      await supabase.from("buchungen").update({ gelesen: true }).eq("id", b.id)
-      setUngelesen((prev) => prev.filter((x) => !(x.id === b.id && x._rolle === b._rolle)))
     } else {
-      await supabase.from("buchungen").update({ bucher_gelesen: true }).eq("id", b.id)
+      await supabase.rpc('mark_buchung_read', { p_id: b.id, p_rolle: b._rolle })
       setUngelesen((prev) => prev.filter((x) => !(x.id === b.id && x._rolle === b._rolle)))
     }
     setGlockeOffen(false)
@@ -136,10 +133,7 @@ export default function Navbar() {
 
   async function alleGelesen() {
     markingReadRef.current = true
-    const anbieterIds = ungelesen.filter((b) => b._rolle === 'anbieter').map((b) => b.id)
-    const bucherIds = ungelesen.filter((b) => b._rolle === 'bucher').map((b) => b.id)
-    if (anbieterIds.length > 0) await supabase.from("buchungen").update({ gelesen: true }).in("id", anbieterIds)
-    if (bucherIds.length > 0) await supabase.from("buchungen").update({ bucher_gelesen: true }).in("id", bucherIds)
+    await supabase.rpc('mark_all_notifications_read')
     const gameIds = [...new Set(ungelesenChat.map((m) => m.game_id))]
     gameIds.forEach((gid) => chatAlsGelesenMarkieren(gid))
     setUngelesen([])
