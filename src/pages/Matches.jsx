@@ -898,7 +898,9 @@ function KalenderAnsicht({ spiele, onSelectGame, onEdit, onOnlineStellen, onDele
   );
 }
 
-function MeineTab({ userLocation, onSelectGame, session, allGames, onRefresh, onEdit, onOnlineStellen, onDelete, onEintragen }) {
+function MeineTab({ userLocation, onSelectGame, session, onEdit, onOnlineStellen, onDelete, onEintragen }) {
+  const [eigeneSpiele, setEigeneSpiele] = useState([]);
+  const [ladenEigene, setLadenEigene] = useState(true);
   const [meineBuchungen, setMeineBuchungen] = useState([]);
   const [buchungsSpiele, setBuchungsSpiele] = useState([]);
   const [ladenBuchungen, setLadenBuchungen] = useState(true);
@@ -906,27 +908,63 @@ function MeineTab({ userLocation, onSelectGame, session, allGames, onRefresh, on
   const [viewMode, setViewMode] = useState("liste");
 
   useEffect(() => {
-    onRefresh();
+    ladeEigeneSpiele();
     ladeBuchungen();
   }, []);
 
+  async function ladeEigeneSpiele() {
+    setLadenEigene(true);
+    const { data, error } = await supabase
+      .from("games")
+      .select("*")
+      .eq("anbieter_email", session.user.email)
+      .order("datum");
+    if (error) console.error("Eigene Spiele laden:", error);
+    if (data) setEigeneSpiele(data);
+    setLadenEigene(false);
+  }
+
   async function ladeBuchungen() {
     setLadenBuchungen(true);
-    const { data: buchungen } = await supabase.from("buchungen").select("*").eq("bucher_email", session.user.email);
+    const { data: buchungen, error: buchungenError } = await supabase
+      .from("buchungen")
+      .select("*")
+      .eq("bucher_email", session.user.email);
+    if (buchungenError) { console.error("Buchungen laden:", buchungenError); setLadenBuchungen(false); return; }
     if (!buchungen || buchungen.length === 0) { setLadenBuchungen(false); return; }
-    const gameIds = buchungen.map((b) => b.game_id);
-    const { data: spiele } = await supabase.from("games").select("*").in("id", gameIds);
-    if (spiele) setBuchungsSpiele(spiele);
     setMeineBuchungen(buchungen);
+    const gameIds = buchungen.map((b) => b.game_id);
+    const { data: spiele, error: spieleError } = await supabase.from("games").select("*").in("id", gameIds);
+    if (spieleError) console.error("Gebuchte Spiele laden:", spieleError);
+    if (spiele && spiele.length > 0) {
+      setBuchungsSpiele(spiele);
+    } else {
+      // Fallback: Spieldaten direkt aus Buchungen rekonstruieren
+      setBuchungsSpiele(buchungen.map((b) => ({
+        id: b.game_id,
+        datum: b.datum.split(".").reverse().join("-"),
+        uhrzeit: b.uhrzeit,
+        verein: b.anbieter_verein,
+        mannschaft: null,
+        status: "gebucht",
+      })));
+    }
     setLadenBuchungen(false);
   }
 
-  const eigeneSpiele = allGames
-    .filter((g) => g.anbieter_email === session.user.email)
-    .sort((a, b) => a.datum.localeCompare(b.datum));
-  const sortierteAnfragen = buchungsSpiele.sort((a, b) => a.datum.localeCompare(b.datum));
+  async function handleOnlineStellen(gameId) {
+    await onOnlineStellen(gameId);
+    ladeEigeneSpiele();
+  }
 
-  const alleSpiele = [...eigeneSpiele, ...sortierteAnfragen].sort((a, b) => a.datum.localeCompare(b.datum));
+  async function handleDelete(gameId) {
+    await onDelete(gameId);
+    ladeEigeneSpiele();
+  }
+
+  const sortierteEigene = [...eigeneSpiele].sort((a, b) => a.datum.localeCompare(b.datum));
+  const sortierteAnfragen = [...buchungsSpiele].sort((a, b) => a.datum.localeCompare(b.datum));
+  const alleSpiele = [...sortierteEigene, ...sortierteAnfragen].sort((a, b) => a.datum.localeCompare(b.datum));
 
   return (
     <div>
@@ -950,13 +988,13 @@ function MeineTab({ userLocation, onSelectGame, session, allGames, onRefresh, on
       {viewMode === "kalender" ? (
         <KalenderAnsicht spiele={alleSpiele}
           onSelectGame={onSelectGame} onEdit={onEdit}
-          onOnlineStellen={onOnlineStellen} onDelete={onDelete} />
+          onOnlineStellen={handleOnlineStellen} onDelete={handleDelete} />
       ) : (
         <>
           <div className="flex mb-5 bg-gray-100 rounded-xl p-1">
             <button onClick={() => setActiveSection("eigene")}
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${activeSection === "eigene" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}>
-              Ausgeschrieben ({eigeneSpiele.length})
+              Ausgeschrieben ({sortierteEigene.length})
             </button>
             <button onClick={() => setActiveSection("anfragen")}
               className={`flex-1 py-2 rounded-lg text-sm font-semibold transition-colors ${activeSection === "anfragen" ? "bg-white text-gray-900 shadow-sm" : "text-gray-400"}`}>
@@ -965,17 +1003,21 @@ function MeineTab({ userLocation, onSelectGame, session, allGames, onRefresh, on
           </div>
 
           {activeSection === "eigene" && (
-            eigeneSpiele.length === 0 ? (
+            ladenEigene ? (
+              <div className="flex justify-center py-16">
+                <div className="w-8 h-8 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : sortierteEigene.length === 0 ? (
               <div className="bg-white rounded-xl border border-gray-200 text-center py-16 text-gray-400">
                 <p className="text-base mb-1">Noch keine Spiele</p>
                 <p className="text-sm">Erstelle dein erstes Spiel mit „+ Eintragen"</p>
               </div>
             ) : (
               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                {eigeneSpiele.map((g) => (
+                {sortierteEigene.map((g) => (
                   <MeineSpielZeile key={g.id} game={g}
                     onNavigate={onSelectGame} onEdit={onEdit}
-                    onOnlineStellen={onOnlineStellen} onDelete={onDelete} />
+                    onOnlineStellen={handleOnlineStellen} onDelete={handleDelete} />
                 ))}
               </div>
             )
@@ -1165,7 +1207,7 @@ export default function Matches() {
       {activeTab === "neu" && !istSchiri && <EintragenTab onSubmit={handleAddGame} />}
       {activeTab === "suche" && <SucheTab games={games} userLocation={userLocation} onSelectGame={(g) => navigate('/spiele/' + g.id)} />}
       {activeTab === "boerse" && <SchiriBörseTab games={games} userLocation={userLocation} session={session} onRefresh={ladeSpiele} />}
-      {activeTab === "meine" && !istSchiri && session && <MeineTab userLocation={userLocation} onSelectGame={(g) => navigate('/spiele/' + g.id)} session={session} allGames={games} onRefresh={ladeSpiele} onEdit={setEditGame} onOnlineStellen={handleSpieleOnline} onDelete={handleDeleteGame} onEintragen={() => setTab("neu")} />}
+      {activeTab === "meine" && !istSchiri && session && <MeineTab userLocation={userLocation} onSelectGame={(g) => navigate('/spiele/' + g.id)} session={session} onEdit={setEditGame} onOnlineStellen={handleSpieleOnline} onDelete={handleDeleteGame} onEintragen={() => setTab("neu")} />}
 
       {editGame && <SpieleEditModal game={editGame} onClose={() => setEditGame(null)} onSave={handleEditGame} />}
       {showStandortModal && <StandortModal onClose={() => setShowStandortModal(false)} onSave={(loc) => { setUserLocation(loc); setShowStandortModal(false); showToast(`Standort: ${loc.label}`); }} />}
