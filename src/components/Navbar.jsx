@@ -120,11 +120,11 @@ export default function Navbar() {
     setUngelesenChat((prev) => prev.filter((m) => m.game_id !== gameId))
   }
 
-  async function handleNotificationClick(b) {
+  function handleNotificationClick(b) {
     if (b._rolle === 'chat') {
       chatAlsGelesenMarkieren(b.game_id)
     } else {
-      await supabase.rpc('mark_buchung_read', { p_id: b.id, p_rolle: b._rolle })
+      supabase.rpc('mark_buchung_read', { p_id: b.id, p_rolle: b._rolle }).catch(() => {})
       setUngelesen((prev) => prev.filter((x) => !(x.id === b.id && x._rolle === b._rolle)))
     }
     setGlockeOffen(false)
