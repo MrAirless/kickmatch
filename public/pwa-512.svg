@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- Weißer Hintergrund (wichtig für Smartphone-Homescreen) -->
+  <rect width="512" height="512" fill="white"/>
+  <!-- Grüner App-Icon-Hintergrund -->
+  <rect width="512" height="512" rx="106" fill="#1D9E75"/>
+
+  <defs>
+    <clipPath id="ball512">
+      <circle cx="256" cy="245" r="155"/>
+    </clipPath>
+  </defs>
+
+  <!-- Weißer Ball -->
+  <circle cx="256" cy="245" r="155" fill="white"/>
+
+  <!-- Fußball-Patches (geclippt auf Ballkreis, skaliert 192→512: Faktor ~2.667) -->
+  <g clip-path="url(#ball512)" fill="#1a1a1a">
+    <!-- Mittleres Pentagon -->
+    <polygon points="256,176 309,213 288,274 224,274 203,213"/>
+    <!-- Außen oben -->
+    <polygon points="256,176 195,131 219,61 293,61 317,131"/>
+    <!-- Außen rechts oben -->
+    <polygon points="309,213 334,144 411,144 432,216 371,259"/>
+    <!-- Außen rechts unten -->
+    <polygon points="288,274 363,274 387,347 325,392 264,347"/>
+    <!-- Außen links unten -->
+    <polygon points="224,274 248,347 186,392 125,350 149,274"/>
+    <!-- Außen links oben -->
+    <polygon points="203,213 144,259 80,216 101,144 178,144"/>
+  </g>
+
+  <!-- Ball-Rand -->
+  <circle cx="256" cy="245" r="155" fill="none" stroke="#e8e8e8" stroke-width="3"/>
+
+  <!-- KickMatch Schriftzug -->
+  <text x="256" y="450" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="52" fill="white" letter-spacing="1">KickMatch</text>
+</svg>
