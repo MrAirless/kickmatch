@@ -59,7 +59,7 @@ export default function Einladung() {
     await fetch('/api/redeem-invite', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, userId: data.user.id }),
+      body: JSON.stringify({ token, userId: data.user.id, fullName }),
     })
 
     setLoading(false)
