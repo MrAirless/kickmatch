@@ -499,104 +499,157 @@ function DetailModal({ game, userLocation, session, onClose, onBook, onRefresh, 
   const isOffer = game.type === "angebot";
   const istEigenesSpiel = session?.user?.email && game.anbieter_email === session.user.email;
 
+  const headerBg = isOffer
+    ? "linear-gradient(135deg, #1D9E75 0%, #0f7a58 100%)"
+    : "linear-gradient(135deg, #534AB7 0%, #3a32a0 100%)";
+
   return (
     <>
-      <div onClick={onClose} className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-        <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto border border-gray-100 shadow-2xl relative">
-          <button onClick={onClose} className="absolute top-4 right-4 w-7 h-7 flex items-center justify-center rounded-full border border-gray-200 bg-gray-50 text-sm text-gray-500 hover:bg-gray-100">✕</button>
+      <div onClick={onClose} className="fixed inset-0 bg-black/60 flex items-end justify-center z-50 sm:items-center sm:p-4">
+        <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-md max-h-[92vh] overflow-y-auto shadow-2xl">
 
-          <div className="flex gap-1.5 flex-wrap mb-4">
-            <InlineBadge bg={isOffer ? "#E1F5EE" : "#EEEDFE"} color={isOffer ? "#085041" : "#3C3489"} border={isOffer ? "#A8DFC4" : "#C5C2F8"}>
-              {isOffer ? "⚽ Angebot" : "🔍 Anfrage"}
-            </InlineBadge>
-            {kat && <InlineBadge bg={c.bg} color={c.text} border={c.border}>{kat}</InlineBadge>}
-            {game.status === "gebucht" && <InlineBadge bg="#FCEBEB" color="#791F1F" border="#F09595">Gebucht</InlineBadge>}
-            {dist !== null && <span className="text-xs text-gray-400 self-center">{dist} km</span>}
-          </div>
-
-          <h2 className="text-xl font-bold text-gray-900 mb-0.5">{game.verein}</h2>
-          <p className="text-sm text-gray-500 font-medium mb-5">{mannschaft}</p>
-
-          <div className="bg-gray-50 rounded-xl border border-gray-100 overflow-hidden mb-4">
-            {[
-              { icon: "📅", label: "Datum & Uhrzeit", value: `${formatDate(game.datum)} um ${game.uhrzeit} Uhr` },
-              { icon: "📍", label: "Sportplatz", value: game.platz ? `${game.platz} — ${game.adresse}` : "Noch offen" },
-              { icon: "🌿", label: "Rasenart", value: game.rasen },
-              ...(game.spielfeld_groesse ? [{ icon: "⬛", label: "Spielfeldgröße", value: game.spielfeld_groesse }] : []),
-              ...(game.spieldauer ? [{ icon: "⏱️", label: "Spieldauer", value: `${game.spieldauer} Minuten` }] : []),
-              { icon: "👤", label: "Trainer", value: game.trainer_name },
-              { icon: "📞", label: "Telefon", value: game.telefon },
-            ].map((row, i, arr) => (
-              <div key={row.label} className={`flex gap-3 px-4 py-2.5 ${i < arr.length - 1 ? "border-b border-gray-100" : ""}`}>
-                <span className="text-base w-6 flex-shrink-0">{row.icon}</span>
+          {/* Farbiger Header */}
+          <div className="relative" style={{ background: headerBg }}>
+            <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/20 text-white text-sm hover:bg-white/30 transition-colors">✕</button>
+            <div className="px-6 pt-6 pb-7">
+              <div className="flex gap-1.5 flex-wrap mb-3">
+                <span className="bg-white/20 text-white text-xs font-semibold px-2.5 py-1 rounded-full">
+                  {isOffer ? "⚽ Angebot" : "🔍 Anfrage"}
+                </span>
+                {kat && <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ background: c.bg, color: c.text }}>{kat}</span>}
+                {game.status === "gebucht" && <span className="bg-red-500 text-white text-xs font-semibold px-2.5 py-1 rounded-full">Gebucht</span>}
+              </div>
+              <h2 className="text-2xl font-bold text-white mb-0.5">{game.verein}</h2>
+              <p className="text-white/75 font-medium text-sm">{mannschaft}</p>
+              <div className="flex gap-5 mt-5">
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">{row.label}</p>
-                  <p className={`text-sm mt-0.5 ${row.label === "Telefon" ? "text-brand-600" : "text-gray-900"}`}>{row.value}</p>
+                  <p className="text-white/60 text-xs uppercase tracking-wide font-semibold">Datum</p>
+                  <p className="text-white font-bold text-base mt-0.5">{formatDate(game.datum)}</p>
                 </div>
+                <div className="w-px bg-white/25" />
+                <div>
+                  <p className="text-white/60 text-xs uppercase tracking-wide font-semibold">Uhrzeit</p>
+                  <p className="text-white font-bold text-base mt-0.5">{game.uhrzeit} Uhr</p>
+                </div>
+                {dist !== null && (
+                  <>
+                    <div className="w-px bg-white/25" />
+                    <div>
+                      <p className="text-white/60 text-xs uppercase tracking-wide font-semibold">Entfernung</p>
+                      <p className="text-white font-bold text-base mt-0.5">{dist} km</p>
+                    </div>
+                  </>
+                )}
               </div>
-            ))}
+            </div>
           </div>
 
-          <div className="bg-gray-50 rounded-xl border border-gray-100 px-4 py-3 mb-4 flex items-center gap-3">
-            <span className="text-base">💪</span>
-            <div>
-              <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold">Spielstärke</p>
-              <div className="flex items-center gap-2 mt-1">
-                <StrengthDots value={game.staerke} />
-                <span className="text-sm text-gray-500">Stufe {game.staerke} von 5</span>
+          <div className="p-5 space-y-3">
+
+            {/* Spielort */}
+            <div className="bg-gray-50 rounded-2xl p-4 flex gap-3 items-start">
+              <span className="text-lg mt-0.5">📍</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-0.5">Spielort</p>
+                <p className="font-semibold text-gray-900">{game.platz || "Noch offen"}</p>
+                {game.adresse && <p className="text-sm text-gray-500 mt-0.5 truncate">{game.adresse}</p>}
               </div>
-            </div>
-          </div>
-
-          {game.schiri_benoetigt && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
-              <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-1">🟡 Schiedsrichter</p>
-              <p className="text-sm text-amber-700">
-                {game.schiri_status === "besetzt" ? "✓ Schiedsrichter ist bestätigt" :
-                  game.schiri_status === "angefragt" ? "Bewerbungen eingegangen — Trainer prüft" :
-                    "Noch kein Schiedsrichter — Bewerbungen willkommen"}
-              </p>
-            </div>
-          )}
-
-          {game.wichtige_infos && (
-            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-4">
-              <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-2">ℹ️ Wichtige Infos</p>
-              <p className="text-sm text-amber-800 leading-relaxed">{game.wichtige_infos}</p>
-            </div>
-          )}
-
-          {mapsUrl && (
-            <a href={mapsUrl} target="_blank" rel="noreferrer" className="block text-center w-full py-2.5 bg-brand-600 text-white rounded-xl text-sm font-medium hover:bg-brand-700 mb-2 transition-colors">
-              🗺️ Navigation starten
-            </a>
-          )}
-
-          {game.schiri_benoetigt && game.schiri_status === "angefragt" && !istSchiri && (
-            <button onClick={() => setShowSchiriAnfragen(true)} className="w-full py-2.5 bg-amber-50 text-amber-700 border border-amber-200 rounded-xl text-sm font-semibold mb-2 hover:bg-amber-100 transition-colors">
-              🟡 Schiedsrichter-Bewerbungen ansehen
-            </button>
-          )}
-
-          {istEigenesSpiel ? (
-            <div className="space-y-2">
-              <button onClick={() => { onClose(); onEdit(game); }} className="btn-primary w-full justify-center">
-                ✏️ Spiel bearbeiten
-              </button>
-              {game.status === "gebucht" && (
-                <button onClick={() => { onOnlineStellen(game.id); onClose(); }}
-                  className="w-full py-2.5 bg-brand-50 text-brand-700 border border-brand-200 rounded-xl text-sm font-semibold hover:bg-brand-100 transition-colors">
-                  🟢 Wieder online stellen
-                </button>
+              {mapsUrl && (
+                <a href={mapsUrl} target="_blank" rel="noreferrer"
+                  className="flex-shrink-0 flex items-center gap-1.5 bg-brand-600 text-white text-xs font-semibold px-3 py-2 rounded-xl hover:bg-brand-700 transition-colors self-center">
+                  🗺️ Karte
+                </a>
               )}
             </div>
-          ) : game.status !== "gebucht" ? (
-            <button onClick={() => { onClose(); onBook(game); }} className="btn-primary w-full justify-center">
-              ⚡ Spiel jetzt annehmen
-            </button>
-          ) : (
-            <div className="text-center py-3 text-sm text-gray-400 border border-gray-200 rounded-xl">Bereits vergeben</div>
-          )}
+
+            {/* Detail-Raster */}
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="bg-gray-50 rounded-2xl p-3.5">
+                <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Rasen</p>
+                <p className="text-sm font-semibold text-gray-900">🌿 {game.rasen}</p>
+              </div>
+              <div className="bg-gray-50 rounded-2xl p-3.5">
+                <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Spielstärke</p>
+                <div className="flex items-center gap-1.5 mt-1">
+                  <StrengthDots value={game.staerke} />
+                  <span className="text-xs text-gray-400">({game.staerke}/5)</span>
+                </div>
+              </div>
+              {game.spielfeld_groesse && (
+                <div className="bg-gray-50 rounded-2xl p-3.5">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Spielfeld</p>
+                  <p className="text-sm font-semibold text-gray-900">⬛ {game.spielfeld_groesse}</p>
+                </div>
+              )}
+              {game.spieldauer && (
+                <div className="bg-gray-50 rounded-2xl p-3.5">
+                  <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-1">Spieldauer</p>
+                  <p className="text-sm font-semibold text-gray-900">⏱️ {game.spieldauer} Min</p>
+                </div>
+              )}
+            </div>
+
+            {/* Kontakt */}
+            <div className="bg-gray-50 rounded-2xl p-4">
+              <p className="text-xs text-gray-400 uppercase tracking-wider font-semibold mb-3">Kontakt</p>
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-gray-900">{game.trainer_name}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Trainer</p>
+                </div>
+                <a href={`tel:${game.telefon}`}
+                  className="flex items-center gap-2 bg-brand-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-brand-700 transition-colors flex-shrink-0">
+                  📞 Anrufen
+                </a>
+              </div>
+            </div>
+
+            {/* Schiedsrichter */}
+            {game.schiri_benoetigt && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5">
+                <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-1">🟡 Schiedsrichter</p>
+                <p className="text-sm text-amber-700">
+                  {game.schiri_status === "besetzt" ? "✓ Schiedsrichter ist bestätigt" :
+                    game.schiri_status === "angefragt" ? "Bewerbungen eingegangen — Trainer prüft" :
+                      "Noch kein Schiedsrichter — Bewerbungen willkommen"}
+                </p>
+                {game.schiri_status === "angefragt" && !istSchiri && (
+                  <button onClick={() => setShowSchiriAnfragen(true)} className="mt-2.5 w-full py-2 bg-amber-100 text-amber-800 border border-amber-300 rounded-xl text-xs font-semibold hover:bg-amber-200 transition-colors">
+                    Bewerbungen ansehen
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Wichtige Infos */}
+            {game.wichtige_infos && (
+              <div className="bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3.5">
+                <p className="text-xs font-bold text-amber-700 uppercase tracking-wider mb-2">ℹ️ Wichtige Infos</p>
+                <p className="text-sm text-amber-800 leading-relaxed">{game.wichtige_infos}</p>
+              </div>
+            )}
+
+            {/* CTA */}
+            {istEigenesSpiel ? (
+              <div className="space-y-2 pt-1">
+                <button onClick={() => { onClose(); onEdit(game); }} className="btn-primary w-full justify-center">
+                  ✏️ Spiel bearbeiten
+                </button>
+                {game.status === "gebucht" && (
+                  <button onClick={() => { onOnlineStellen(game.id); onClose(); }}
+                    className="w-full py-3 bg-brand-50 text-brand-700 border border-brand-200 rounded-xl text-sm font-semibold hover:bg-brand-100 transition-colors">
+                    🟢 Wieder online stellen
+                  </button>
+                )}
+              </div>
+            ) : game.status !== "gebucht" ? (
+              <button onClick={() => { onClose(); onBook(game); }} className="btn-primary w-full justify-center !py-3.5 text-base">
+                ⚡ Spiel jetzt annehmen
+              </button>
+            ) : (
+              <div className="text-center py-3.5 text-sm text-gray-400 border border-gray-200 rounded-2xl">Bereits vergeben</div>
+            )}
+          </div>
         </div>
       </div>
       {showSchiriAnfragen && (
