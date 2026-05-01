@@ -27,29 +27,48 @@ export default function Admin() {
   }
 
   async function ladeData() {
-    const jwt = await getJwt()
-    const res = await fetch('/api/admin-get-data', {
-      headers: { Authorization: `Bearer ${jwt}` },
-    })
-    const data = await res.json()
-    if (data.vereine) setVereine(data.vereine)
-    if (data.links) setAllLinks(data.links)
+    try {
+      const jwt = await getJwt()
+      const res = await fetch('/api/admin-get-data', {
+        headers: { Authorization: `Bearer ${jwt}` },
+      })
+      if (!res.ok) {
+        const text = await res.text()
+        console.error('admin-get-data failed', res.status, text)
+        setLaden(false)
+        return
+      }
+      const data = await res.json()
+      if (data.vereine) setVereine(data.vereine)
+      if (data.links) setAllLinks(data.links)
+    } catch (err) {
+      console.error('ladeData error:', err)
+    }
     setLaden(false)
   }
 
   async function createLink(clubId) {
     const key = clubId || 'demo'
     setGeneratingFor(key)
-    const jwt = await getJwt()
-    const res = await fetch('/api/admin-create-link', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
-      body: JSON.stringify({ clubId: clubId || null }),
-    })
-    const data = await res.json()
-    if (data.token) {
-      setNewLink({ token: data.token, clubId: clubId || null })
-      await ladeData()
+    try {
+      const jwt = await getJwt()
+      const res = await fetch('/api/admin-create-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${jwt}` },
+        body: JSON.stringify({ clubId: clubId || null }),
+      })
+      if (!res.ok) {
+        const text = await res.text()
+        console.error('admin-create-link failed', res.status, text)
+      } else {
+        const data = await res.json()
+        if (data.token) {
+          setNewLink({ token: data.token, clubId: clubId || null })
+          await ladeData()
+        }
+      }
+    } catch (err) {
+      console.error('createLink error:', err)
     }
     setGeneratingFor(null)
   }
