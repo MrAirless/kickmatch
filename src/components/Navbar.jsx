@@ -1,24 +1,79 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
+
+function NotificationDropdown({ ungelesen, onKlick, onAlleGelesen }) {
+  return (
+    <div className="absolute right-0 top-full mt-2 w-80 bg-white rounded-xl border border-gray-200 shadow-xl z-50 overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <span className="text-sm font-semibold text-gray-900">Benachrichtigungen</span>
+        {ungelesen.length > 0 && (
+          <button onClick={onAlleGelesen} className="text-xs text-brand-600 hover:underline">Alle als gelesen</button>
+        )}
+      </div>
+      {ungelesen.length === 0 ? (
+        <div className="px-4 py-8 text-center text-sm text-gray-400">Keine neuen Benachrichtigungen</div>
+      ) : (
+        <div className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
+          {ungelesen.map((b) => (
+            <button key={b.id} onClick={() => onKlick(b)} className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors">
+              <p className="text-sm font-semibold text-gray-900 mb-0.5">
+                Neue Anfrage von {b.bucher_verein}
+              </p>
+              <p className="text-xs text-gray-500">
+                {b.bucher_name} · {b.datum} · {b.uhrzeit} Uhr
+              </p>
+              {b.bucher_mannschaft && (
+                <p className="text-xs text-gray-400 mt-0.5">{b.bucher_mannschaft}</p>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export default function Navbar() {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
+  const [glockeOffen, setGlockeOffen] = useState(false)
+  const glockeRef = useRef(null)
 
   const rolle = user?.user_metadata?.rolle || 'trainer'
   const istSchiri = rolle === 'schiedsrichter'
-  const [unreadCount, setUnreadCount] = useState(0)
+  const [ungelesen, setUngelesen] = useState([])
+  const unreadCount = ungelesen.length
 
   useEffect(() => {
     if (!user || istSchiri) return
-    supabase.from("buchungen").select("id", { count: "exact", head: true })
-      .eq("anbieter_email", user.email).eq("gelesen", false)
-      .then(({ count }) => setUnreadCount(count || 0))
+    supabase.from("buchungen").select("*").eq("anbieter_email", user.email).eq("gelesen", false)
+      .then(({ data }) => { if (data) setUngelesen(data) })
   }, [user, istSchiri])
+
+  useEffect(() => {
+    function handleClick(e) {
+      if (glockeRef.current && !glockeRef.current.contains(e.target)) setGlockeOffen(false)
+    }
+    document.addEventListener("mousedown", handleClick)
+    return () => document.removeEventListener("mousedown", handleClick)
+  }, [])
+
+  async function handleNotificationClick(b) {
+    await supabase.from("buchungen").update({ gelesen: true }).eq("id", b.id)
+    setUngelesen((prev) => prev.filter((x) => x.id !== b.id))
+    setGlockeOffen(false)
+    navigate(`/spiele/${b.game_id}`)
+  }
+
+  async function alleGelesen() {
+    await supabase.from("buchungen").update({ gelesen: true }).in("id", ungelesen.map((b) => b.id))
+    setUngelesen([])
+    setGlockeOffen(false)
+  }
 
   const currentTab = location.pathname === '/spiele'
     ? (new URLSearchParams(location.search).get('tab') || 'liste')
@@ -80,17 +135,20 @@ export default function Navbar() {
           {user ? (
             <>
               {!istSchiri && (
-                <Link to="/spiele?tab=meine" className="relative p-2 text-gray-400 hover:text-gray-700 transition-colors">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                    <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-                  </svg>
-                  {unreadCount > 0 && (
-                    <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold px-0.5">
-                      {unreadCount}
-                    </span>
-                  )}
-                </Link>
+                <div ref={glockeRef} className="relative">
+                  <button onClick={() => setGlockeOffen((o) => !o)} className="relative p-2 text-gray-400 hover:text-gray-700 transition-colors">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                      <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                    </svg>
+                    {unreadCount > 0 && (
+                      <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold px-0.5">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </button>
+                  {glockeOffen && <NotificationDropdown ungelesen={ungelesen} onKlick={handleNotificationClick} onAlleGelesen={alleGelesen} />}
+                </div>
               )}
               <Link to="/profil" className="btn-ghost text-sm">Profil</Link>
               <button onClick={handleSignOut} className="btn-secondary text-sm">Abmelden</button>
@@ -105,17 +163,20 @@ export default function Navbar() {
 
         <div className="flex md:hidden items-center gap-2">
           {user && !istSchiri && (
-            <Link to="/spiele?tab=meine" className="relative p-2 text-gray-400 hover:text-gray-700 transition-colors">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
-                <path d="M13.73 21a2 2 0 0 1-3.46 0" />
-              </svg>
-              {unreadCount > 0 && (
-                <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold px-0.5">
-                  {unreadCount}
-                </span>
-              )}
-            </Link>
+            <div ref={glockeRef} className="relative">
+              <button onClick={() => setGlockeOffen((o) => !o)} className="relative p-2 text-gray-400 hover:text-gray-700 transition-colors">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
+                  <path d="M13.73 21a2 2 0 0 1-3.46 0" />
+                </svg>
+                {unreadCount > 0 && (
+                  <span className="absolute top-0.5 right-0.5 min-w-[16px] h-4 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold px-0.5">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+              {glockeOffen && <NotificationDropdown ungelesen={ungelesen} onKlick={handleNotificationClick} onAlleGelesen={alleGelesen} />}
+            </div>
           )}
           <button
             onClick={() => setMenuOpen(!menuOpen)}
