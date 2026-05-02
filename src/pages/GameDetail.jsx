@@ -135,6 +135,22 @@ export default function GameDetail() {
       });
   }, [game?.id, session?.user?.id, id]);
 
+  useEffect(() => {
+    if (!id || !session) return;
+    const email = session.user?.email;
+    const channel = supabase.channel(`buchungen-live-${id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'buchungen',
+        filter: `game_id=eq.${id}`,
+      }, (payload) => {
+        const b = payload.new;
+        setAnfragen(prev => prev.map(a => a.id === b.id ? { ...a, ...b } : a));
+        if (b.bucher_email === email) setBuchung(prev => ({ ...prev, ...b }));
+      })
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [id, session?.user?.id]);
+
   function showToast(msg) { setToast(msg); setTimeout(() => setToast(""), 3000); }
 
   async function handleBooking(formData) {
