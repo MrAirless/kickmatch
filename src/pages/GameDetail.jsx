@@ -151,6 +151,11 @@ export default function GameDetail() {
     if (buchungError) { alert("Fehler beim Speichern: " + buchungError.message); return; }
 
     if (game.anbieter_email) {
+      supabase.rpc('create_notification', {
+        p_user_email: game.anbieter_email, p_game_id: String(id),
+        p_type: 'neue_anfrage', p_title: 'Neue Anfrage',
+        p_message: `${formData.verein} · ${formatDate(game.datum)}`,
+      }).catch(() => {})
       fetch('/api/send-push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -177,6 +182,11 @@ export default function GameDetail() {
     const { error: e2 } = await supabase.from("games").update({ status: "gebucht" }).eq("id", id);
     if (e2) { alert("Fehler beim Aktualisieren des Spiels: " + e2.message); return; }
     if (anfrage.bucher_email) {
+      supabase.rpc('create_notification', {
+        p_user_email: anfrage.bucher_email, p_game_id: String(id),
+        p_type: 'angenommen', p_title: '🎉 Anfrage angenommen',
+        p_message: `${game.verein} · ${formatDate(game.datum)}`,
+      }).catch(() => {})
       fetch('/api/send-push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -188,6 +198,13 @@ export default function GameDetail() {
         }),
       }).catch(() => {});
     }
+    anfragen.filter((a) => a.id !== anfrage.id && a.bucher_email).forEach((a) => {
+      supabase.rpc('create_notification', {
+        p_user_email: a.bucher_email, p_game_id: String(id),
+        p_type: 'abgelehnt', p_title: 'Anfrage abgelehnt',
+        p_message: `${game.verein} · ${formatDate(game.datum)}`,
+      }).catch(() => {})
+    })
     setAnfragen((prev) => prev.map((a) => ({ ...a, status: a.id === anfrage.id ? "angenommen" : "abgelehnt" })));
     setGame((g) => ({ ...g, status: "gebucht" }));
     showToast("Anfrage angenommen!");
@@ -215,6 +232,11 @@ export default function GameDetail() {
     await supabase.from("buchungen").update({ status: "angefragt", bucher_gelesen: false }).eq("game_id", id);
     if (aktuelleBuchungen) {
       aktuelleBuchungen.filter((b) => b.status === "angenommen" && b.bucher_email).forEach((b) => {
+        supabase.rpc('create_notification', {
+          p_user_email: b.bucher_email, p_game_id: String(id),
+          p_type: 'wieder_offen', p_title: 'Spiel wieder offen',
+          p_message: `${game.verein} · ${formatDate(game.datum)}`,
+        }).catch(() => {})
         fetch('/api/send-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -236,6 +258,11 @@ export default function GameDetail() {
     if (!window.confirm(`Anfrage von ${anfrage.bucher_verein} ablehnen?`)) return;
     await supabase.from("buchungen").update({ status: "abgelehnt", bucher_gelesen: false }).eq("id", anfrage.id);
     if (anfrage.bucher_email) {
+      supabase.rpc('create_notification', {
+        p_user_email: anfrage.bucher_email, p_game_id: String(id),
+        p_type: 'abgelehnt', p_title: 'Anfrage abgelehnt',
+        p_message: `${game.verein} · ${formatDate(game.datum)}`,
+      }).catch(() => {})
       fetch('/api/send-push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

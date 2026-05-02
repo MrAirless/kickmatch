@@ -1202,6 +1202,11 @@ export default function Matches() {
     await supabase.from("buchungen").update({ status: "angefragt", bucher_gelesen: false }).eq("game_id", gameId);
     if (aktuelleBuchungen) {
       aktuelleBuchungen.filter((b) => b.status === "angenommen" && b.bucher_email).forEach((b) => {
+        supabase.rpc('create_notification', {
+          p_user_email: b.bucher_email, p_game_id: String(gameId),
+          p_type: 'wieder_offen', p_title: 'Spiel wieder offen',
+          p_message: `${b.datum}`,
+        }).catch(() => {})
         fetch('/api/send-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
