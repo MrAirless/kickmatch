@@ -111,7 +111,10 @@ export default function Home() {
         </p>
         <div className="flex items-center justify-center gap-3">
           {user ? (
-            <Link to="/spiele" className="btn-primary text-base px-6 py-3">Spiele durchsuchen</Link>
+            <>
+              <Link to="/spiele" className="btn-primary text-base px-6 py-3">Spiele durchsuchen</Link>
+              <Link to="/spiele?tab=neu" className="btn-secondary text-base px-6 py-3">+ Eintragen</Link>
+            </>
           ) : (
             <>
               <Link to="/preise" className="btn-primary text-base px-6 py-3">Registrieren</Link>
