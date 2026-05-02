@@ -21,6 +21,7 @@ const Contact = lazy(() => import('./pages/Contact'))
 const Einladung = lazy(() => import('./pages/Einladung'))
 const Vereinsportal = lazy(() => import('./pages/Vereinsportal'))
 const Admin = lazy(() => import('./pages/Admin'))
+const PasswordReset = lazy(() => import('./pages/PasswordReset'))
 
 function PushSubscriber() {
   const { user } = useAuth()
@@ -65,6 +66,7 @@ export default function App() {
                 <Route path="/profil" element={
                   <ProtectedRoute><Profile /></ProtectedRoute>
                 } />
+                <Route path="/passwort-reset" element={<PasswordReset />} />
                 <Route path="/einladung/:token" element={<Einladung />} />
                 <Route path="/vereinsportal" element={
                   <ProtectedRoute><Vereinsportal /></ProtectedRoute>

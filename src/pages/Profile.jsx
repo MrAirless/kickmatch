@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { supabase } from '../lib/supabase'
 
@@ -18,6 +18,24 @@ export default function Profile() {
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState('')
+
+  const [pwLoading, setPwLoading] = useState(false)
+  const [pwSent, setPwSent] = useState(false)
+  const [pwError, setPwError] = useState('')
+
+  async function handlePasswordReset() {
+    setPwError('')
+    setPwLoading(true)
+    const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+      redirectTo: `${window.location.origin}/passwort-reset`,
+    })
+    setPwLoading(false)
+    if (error) {
+      setPwError('Fehler beim Senden der E-Mail.')
+    } else {
+      setPwSent(true)
+    }
+  }
 
   async function handleManageSubscription() {
     setPortalLoading(true)
@@ -177,9 +195,21 @@ export default function Profile() {
                 </>
               )}
             </div>
-            <button onClick={startEditing} className="btn-secondary text-sm mt-6 w-full">
-              Profil bearbeiten
-            </button>
+            <div className="flex flex-col gap-2 mt-6">
+              <button onClick={startEditing} className="btn-secondary text-sm w-full">
+                Profil bearbeiten
+              </button>
+              {pwSent ? (
+                <p className="text-center text-sm text-green-600 py-2">E-Mail wurde gesendet — bitte prüfe dein Postfach.</p>
+              ) : (
+                <>
+                  {pwError && <p className="text-center text-sm text-red-600">{pwError}</p>}
+                  <button onClick={handlePasswordReset} disabled={pwLoading} className="btn-ghost text-sm w-full">
+                    {pwLoading ? 'Wird gesendet…' : 'Passwort ändern'}
+                  </button>
+                </>
+              )}
+            </div>
           </>
         )}
       </div>
