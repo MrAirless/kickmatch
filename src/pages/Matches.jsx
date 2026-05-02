@@ -6,7 +6,7 @@ import {
   MANNSCHAFTEN, SPIELFELD_GROESSEN, SCHIRI_LIZENZEN,
   formatDate, haversine, getKategorie, kategorieColor,
   InlineBadge, StrengthDots, MannschaftAuswahl,
-  BookingModal, SpieleEditModal,
+  BookingModal, SpieleEditModal, BuchungEditModal,
 } from "../lib/gameShared";
 
 function sortiereSpiele(games, sortBy, userLocation) {
@@ -397,7 +397,7 @@ function MeineSpielZeile({ game, onNavigate, onEdit, onOnlineStellen, onDelete }
   );
 }
 
-function AnfrageZeile({ game, buchung, onNavigate }) {
+function AnfrageZeile({ game, buchung, onNavigate, onEdit, onDelete }) {
   const mannschaft = game.mannschaft || game.jugend || "";
   const kat = getKategorie(mannschaft);
   const status = buchung?.status || "angefragt";
@@ -407,18 +407,26 @@ function AnfrageZeile({ game, buchung, onNavigate }) {
     ? { label: "Abgelehnt", cls: "bg-gray-200 text-gray-500" }
     : { label: "⏳ Angefragt", cls: "bg-amber-100 text-amber-700" };
   return (
-    <div className="flex items-center gap-3 py-3.5 px-4 border-b border-gray-100 last:border-0">
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-0.5">
-          <span className="text-xs text-gray-500">{formatDate(game.datum)} · {game.uhrzeit} Uhr</span>
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+    <div className="py-3.5 px-4 border-b border-gray-100 last:border-0">
+      <div className="flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-xs text-gray-500">{formatDate(game.datum)} · {game.uhrzeit === 'flexibel' ? 'Flexibel' : `${game.uhrzeit} Uhr`}</span>
+            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+          </div>
+          <p className="font-semibold text-gray-900 text-sm truncate">{game.verein}</p>
+          <p className="text-xs text-gray-400 truncate">
+            {mannschaft}{kat ? ` · ${kat}` : ""}{buchung ? ` · Kontakt: ${buchung.anbieter_name}` : ""}
+          </p>
         </div>
-        <p className="font-semibold text-gray-900 text-sm truncate">{game.verein}</p>
-        <p className="text-xs text-gray-400 truncate">
-          {mannschaft}{kat ? ` · ${kat}` : ""}{buchung ? ` · Kontakt: ${buchung.anbieter_name}` : ""}
-        </p>
+        <button onClick={() => onNavigate(game)} className="px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors flex-shrink-0">Details</button>
       </div>
-      <button onClick={() => onNavigate(game)} className="px-2.5 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors flex-shrink-0">Details</button>
+      {status === "angefragt" && (
+        <div className="flex gap-2 mt-2">
+          <button onClick={() => onEdit(buchung)} className="flex-1 py-1.5 text-xs border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors">Bearbeiten</button>
+          <button onClick={() => onDelete(buchung)} className="flex-1 py-1.5 text-xs border border-red-200 rounded-lg text-red-500 hover:bg-red-50 transition-colors">Zurückziehen</button>
+        </div>
+      )}
     </div>
   );
 }
@@ -938,6 +946,7 @@ function MeineTab({ userLocation, onSelectGame, session, onEdit, onOnlineStellen
   const [ladenBuchungen, setLadenBuchungen] = useState(true);
   const [activeSection, setActiveSection] = useState("eigene");
   const [viewMode, setViewMode] = useState("liste");
+  const [editBuchung, setEditBuchung] = useState(null);
 
   useEffect(() => {
     ladeEigeneSpiele();
@@ -1003,6 +1012,21 @@ function MeineTab({ userLocation, onSelectGame, session, onEdit, onOnlineStellen
   async function handleDelete(gameId) {
     await onDelete(gameId);
     ladeEigeneSpiele();
+  }
+
+  async function handleBuchungEdit(data) {
+    const { error } = await supabase.from('buchungen').update(data).eq('id', editBuchung.id);
+    if (!error) {
+      setMeineBuchungen(prev => prev.map(b => b.id === editBuchung.id ? { ...b, ...data } : b));
+      setEditBuchung(null);
+    }
+  }
+
+  async function handleBuchungDelete(buchung) {
+    if (!window.confirm('Anfrage wirklich zurückziehen?')) return;
+    await supabase.from('buchungen').delete().eq('id', buchung.id);
+    setMeineBuchungen(prev => prev.filter(b => b.id !== buchung.id));
+    setBuchungsSpiele(prev => prev.filter(g => g.id !== buchung.game_id));
   }
 
   const sortierteEigene = [...eigeneSpiele].sort((a, b) => a.datum.localeCompare(b.datum));
@@ -1091,12 +1115,15 @@ function MeineTab({ userLocation, onSelectGame, session, onEdit, onOnlineStellen
               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                 {sortierteAnfragen.map((g) => {
                   const buchung = meineBuchungen.find((b) => b.game_id === g.id);
-                  return <AnfrageZeile key={g.id} game={g} buchung={buchung} onNavigate={onSelectGame} />;
+                  return <AnfrageZeile key={g.id} game={g} buchung={buchung} onNavigate={onSelectGame} onEdit={setEditBuchung} onDelete={handleBuchungDelete} />;
                 })}
               </div>
             )
           )}
         </>
+      )}
+      {editBuchung && (
+        <BuchungEditModal buchung={editBuchung} onClose={() => setEditBuchung(null)} onSave={handleBuchungEdit} />
       )}
     </div>
   );

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
-import { formatDate, getKategorie, StrengthDots, BookingModal, SpieleEditModal } from "../lib/gameShared";
+import { formatDate, getKategorie, StrengthDots, BookingModal, SpieleEditModal, BuchungEditModal } from "../lib/gameShared";
 
 function InfoRow({ label, value, href }) {
   return (
@@ -109,6 +109,7 @@ export default function GameDetail() {
   const [buchung, setBuchung] = useState(null);
   const [showBuchung, setShowBuchung] = useState(false);
   const [showEdit, setShowEdit] = useState(false);
+  const [showBuchungEdit, setShowBuchungEdit] = useState(false);
   const [toast, setToast] = useState("");
 
   useEffect(() => {
@@ -235,6 +236,21 @@ export default function GameDetail() {
     setAnfragen((prev) => prev.map((a) => ({ ...a, status: a.id === anfrage.id ? "angenommen" : "abgelehnt" })));
     setGame((g) => ({ ...g, status: "gebucht" }));
     showToast("Anfrage angenommen!");
+  }
+
+  async function handleBuchungUpdate(data) {
+    const { error } = await supabase.from('buchungen').update(data).eq('id', buchung.id);
+    if (error) { alert('Fehler: ' + error.message); return; }
+    setBuchung(prev => ({ ...prev, ...data }));
+    setShowBuchungEdit(false);
+    showToast('Anfrage aktualisiert!');
+  }
+
+  async function handleBuchungZurueckziehen() {
+    if (!window.confirm('Anfrage wirklich zurückziehen?')) return;
+    await supabase.from('buchungen').delete().eq('id', buchung.id);
+    setBuchung(null);
+    showToast('Anfrage zurückgezogen.');
   }
 
   async function handleEdit(gameId, formData) {
@@ -506,8 +522,18 @@ export default function GameDetail() {
                   Anfrage wurde leider abgelehnt
                 </div>
               ) : istBucher ? (
-                <div className="text-center py-3.5 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl">
-                  ⏳ Anfrage gesendet – du wirst benachrichtigt
+                <div className="space-y-2">
+                  <div className="text-center py-3.5 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-xl">
+                    ⏳ Anfrage gesendet – du wirst benachrichtigt
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setShowBuchungEdit(true)} className="flex-1 py-2.5 text-sm border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">
+                      Anfrage bearbeiten
+                    </button>
+                    <button onClick={handleBuchungZurueckziehen} className="flex-1 py-2.5 text-sm border border-red-200 rounded-xl text-red-500 hover:bg-red-50 transition-colors">
+                      Zurückziehen
+                    </button>
+                  </div>
                 </div>
               ) : (
                 <div className="text-center py-3.5 text-sm text-gray-400 bg-white border border-gray-200 rounded-xl">
@@ -524,6 +550,9 @@ export default function GameDetail() {
       )}
       {showEdit && (
         <SpieleEditModal game={game} onClose={() => setShowEdit(false)} onSave={handleEdit} />
+      )}
+      {showBuchungEdit && buchung && (
+        <BuchungEditModal buchung={buchung} onClose={() => setShowBuchungEdit(false)} onSave={handleBuchungUpdate} />
       )}
     </div>
   );

@@ -135,6 +135,48 @@ export function BookingModal({ game, onClose, onConfirm }) {
   );
 }
 
+export function BuchungEditModal({ buchung, onClose, onSave }) {
+  const [form, setForm] = useState({
+    mannschaft: buchung.bucher_mannschaft || 'E-Jugend (U10)',
+    tel: buchung.bucher_tel || '',
+    nachricht: buchung.bucher_nachricht || '',
+  });
+  const [loading, setLoading] = useState(false);
+
+  async function handleSave() {
+    setLoading(true);
+    await onSave({ bucher_mannschaft: form.mannschaft, bucher_tel: form.tel, bucher_nachricht: form.nachricht || null });
+    setLoading(false);
+  }
+
+  return (
+    <div onClick={onClose} className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div onClick={(e) => e.stopPropagation()} className="bg-white rounded-2xl p-6 max-w-md w-full max-h-[85vh] overflow-y-auto border border-gray-100 shadow-2xl">
+        <h3 className="text-lg font-bold mb-1">Anfrage bearbeiten</h3>
+        <p className="text-sm text-gray-500 mb-5">Du kannst nur offene Anfragen bearbeiten.</p>
+        <div className="space-y-4">
+          <div>
+            <label className="label">Deine Mannschaft</label>
+            <MannschaftAuswahl value={form.mannschaft} onChange={(v) => setForm({ ...form, mannschaft: v })} />
+          </div>
+          <div>
+            <label className="label">Telefonnummer</label>
+            <input type="tel" className="input" value={form.tel} onChange={(e) => setForm({ ...form, tel: e.target.value })} />
+          </div>
+          <div>
+            <label className="label">Nachricht (optional)</label>
+            <input type="text" className="input" value={form.nachricht} onChange={(e) => setForm({ ...form, nachricht: e.target.value })} placeholder="z.B. Können wir 10:30 Uhr machen?" />
+          </div>
+        </div>
+        <button onClick={handleSave} disabled={loading} className="btn-primary w-full justify-center mt-5" style={{ opacity: loading ? 0.7 : 1 }}>
+          {loading ? 'Wird gespeichert…' : 'Änderungen speichern'}
+        </button>
+        <button onClick={onClose} className="w-full py-2.5 text-sm text-gray-400 hover:text-gray-600 mt-2">Abbrechen</button>
+      </div>
+    </div>
+  );
+}
+
 export function SpieleEditModal({ game, onClose, onSave }) {
   const mannschaft0 = game.mannschaft || game.jugend || MANNSCHAFTEN.Junioren[0];
   const [type, setType] = useState(game.type || "angebot");
