@@ -123,17 +123,17 @@ export default function Navbar() {
       supabase.from("notifications").update({ read: true }).eq("id", b.id)
         .then(() => setBenachrichtigungen(prev => prev.filter(n => n.id !== b.id)))
     }
-    if (b.game_id) window.location.href = `/spiele/${b.game_id}`
+    window.location.href = `/spiele/${b.game_id}`
   }
 
-  async function alleGelesen() {
-    markingReadRef.current = true
-    await supabase.from("notifications").update({ read: true }).eq("user_email", user.email).eq("read", false)
+  function alleGelesen() {
     const gameIds = [...new Set(ungelesenChat.map((m) => m.game_id))]
     gameIds.forEach((gid) => chatAlsGelesenMarkieren(gid))
     setBenachrichtigungen([])
     setUngelesenChat([])
     setGlockeOffen(false)
+    markingReadRef.current = true
+    supabase.from("notifications").update({ read: true }).eq("user_email", user.email).eq("read", false).then(() => {}).catch(() => {})
     setTimeout(() => { markingReadRef.current = false }, 2000)
   }
 

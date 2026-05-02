@@ -929,6 +929,17 @@ function MeineTab({ userLocation, onSelectGame, session, onEdit, onOnlineStellen
     ladeBuchungen();
   }, []);
 
+  useEffect(() => {
+    if (!session) return;
+    const channel = supabase.channel(`meine-buchungen-${session.user.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'buchungen',
+        filter: `bucher_email=eq.${session.user.email}`,
+      }, () => ladeBuchungen())
+      .subscribe();
+    return () => supabase.removeChannel(channel);
+  }, [session?.user?.id]);
+
   async function ladeEigeneSpiele() {
     setLadenEigene(true);
     const { data, error } = await supabase
