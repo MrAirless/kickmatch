@@ -125,7 +125,7 @@ export default function Navbar() {
       supabase.from("notifications").update({ read: true }).eq("id", b.id)
         .then(() => setBenachrichtigungen(prev => prev.filter(n => n.id !== b.id)))
     }
-    window.location.href = `/spiele/${b.game_id}`
+    if (b.game_id) navigate(`/spiele/${b.game_id}`)
   }
 
   function alleGelesen() {
