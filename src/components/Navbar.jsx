@@ -67,7 +67,8 @@ export default function Navbar() {
       .or(`anbieter_email.eq.${user.email},bucher_email.eq.${user.email}`)
     if (!buchungen || buchungen.length === 0) return
     const gameIds = [...new Set(buchungen.map((b) => b.game_id))]
-    const letzteGelesen = JSON.parse(localStorage.getItem('chatGelesen') || '{}')
+    let letzteGelesen = {}
+    try { letzteGelesen = JSON.parse(localStorage.getItem('chatGelesen') || '{}') } catch { localStorage.removeItem('chatGelesen') }
     const checks = await Promise.all(gameIds.map(async (gid) => {
       const seit = letzteGelesen[gid] || '1970-01-01'
       const { data } = await supabase.from("messages").select("id,game_id,sender_email,created_at")
@@ -109,7 +110,8 @@ export default function Navbar() {
   }, [])
 
   function chatAlsGelesenMarkieren(gameId) {
-    const letzteGelesen = JSON.parse(localStorage.getItem('chatGelesen') || '{}')
+    let letzteGelesen = {}
+    try { letzteGelesen = JSON.parse(localStorage.getItem('chatGelesen') || '{}') } catch { localStorage.removeItem('chatGelesen') }
     letzteGelesen[gameId] = new Date().toISOString()
     localStorage.setItem('chatGelesen', JSON.stringify(letzteGelesen))
     setUngelesenChat((prev) => prev.filter((m) => m.game_id !== gameId))
@@ -127,12 +129,12 @@ export default function Navbar() {
   }
 
   function alleGelesen() {
-    const gameIds = [...new Set(ungelesenChat.map((m) => m.game_id))]
-    gameIds.forEach((gid) => chatAlsGelesenMarkieren(gid))
     setBenachrichtigungen([])
     setUngelesenChat([])
     setGlockeOffen(false)
     markingReadRef.current = true
+    const gameIds = [...new Set(ungelesenChat.map((m) => m.game_id))]
+    gameIds.forEach((gid) => chatAlsGelesenMarkieren(gid))
     supabase.from("notifications").update({ read: true }).eq("user_email", user.email).eq("read", false).then(() => {}).catch(() => {})
     setTimeout(() => { markingReadRef.current = false }, 2000)
   }
