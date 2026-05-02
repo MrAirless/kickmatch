@@ -142,9 +142,10 @@ export function SpieleEditModal({ game, onClose, onSave }) {
   const [staerke, setStaerke] = useState(game.staerke || 3);
   const [umkreis, setUmkreis] = useState(game.umkreis_km || 30);
   const [schiriBenoetigt, setSchiriBenoetigt] = useState(game.schiri_benoetigt || false);
+  const [uhrzeitFlexibel, setUhrzeitFlexibel] = useState(game.uhrzeit === 'flexibel');
   const [laden, setLaden] = useState(false);
   const [form, setForm] = useState({
-    datum: game.datum || "", uhrzeit: game.uhrzeit || "10:00", rasen: game.rasen || "Naturrasen",
+    datum: game.datum || "", uhrzeit: game.uhrzeit === 'flexibel' ? "10:00" : (game.uhrzeit || "10:00"), rasen: game.rasen || "Naturrasen",
     platz: game.platz || "", adresse: game.adresse || "", trainer_name: game.trainer_name || "",
     telefon: game.telefon || "", verein: game.verein || "", spielfeld_groesse: game.spielfeld_groesse || "",
     spieldauer: game.spieldauer ? String(game.spieldauer) : "", wichtige_infos: game.wichtige_infos || "",
@@ -155,7 +156,7 @@ export function SpieleEditModal({ game, onClose, onSave }) {
   async function handleSave() {
     if (!form.datum || !form.trainer_name || !form.verein) { alert("Bitte Datum, Name und Verein ausfüllen."); return; }
     setLaden(true);
-    await onSave(game.id, { ...form, type, mannschaft, staerke, umkreis_km: type === "anfrage" ? umkreis : null, schiri_benoetigt: schiriBenoetigt, schiri_status: schiriBenoetigt ? (game.schiri_status || "offen") : null });
+    await onSave(game.id, { ...form, type, mannschaft, staerke, umkreis_km: type === "anfrage" ? umkreis : null, schiri_benoetigt: schiriBenoetigt, schiri_status: schiriBenoetigt ? (game.schiri_status || "offen") : null, uhrzeit: (type === "anfrage" && uhrzeitFlexibel) ? "flexibel" : form.uhrzeit });
     setLaden(false);
   }
 
@@ -186,11 +187,24 @@ export function SpieleEditModal({ game, onClose, onSave }) {
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Spieldaten</p>
             <div className="grid grid-cols-2 gap-3">
               <div><label className="label">Datum</label><input type="date" className="input" value={form.datum} onChange={(e) => set("datum", e.target.value)} /></div>
-              <div><label className="label">Uhrzeit</label><input type="time" className="input" value={form.uhrzeit} onChange={(e) => set("uhrzeit", e.target.value)} /></div>
+              <div>
+                <label className="label">Uhrzeit</label>
+                {type === "anfrage" && uhrzeitFlexibel
+                  ? <div className="input text-sm text-gray-400 flex items-center">Flexibel</div>
+                  : <input type="time" className="input" value={form.uhrzeit} onChange={(e) => set("uhrzeit", e.target.value)} />
+                }
+              </div>
             </div>
+            {type === "anfrage" && (
+              <label className="flex items-center gap-2 cursor-pointer -mt-1">
+                <input type="checkbox" checked={uhrzeitFlexibel} onChange={(e) => setUhrzeitFlexibel(e.target.checked)} className="w-4 h-4 accent-brand-600" />
+                <span className="text-sm text-gray-600">Uhrzeit flexibel / kein fester Termin</span>
+              </label>
+            )}
             <div>
               <label className="label">Rasenart</label>
               <select className="input" value={form.rasen} onChange={(e) => set("rasen", e.target.value)}>
+                {type === "anfrage" && <option value="Egal">Egal / flexibel</option>}
                 {["Naturrasen", "Kunstrasen", "Hartplatz", "Halle"].map((r) => <option key={r}>{r}</option>)}
               </select>
             </div>
@@ -261,16 +275,16 @@ export function SpieleEditModal({ game, onClose, onSave }) {
               <label className="label">Spieldauer (Minuten)</label>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {[40, 50, 60, 70, 80, 90].map((min) => {
-                  const aktiv = parseInt(form.spieldauer) === min;
+                  const aktiv = form.spieldauer === String(min);
                   return (
-                    <button key={min} onClick={() => set("spieldauer", aktiv ? "" : min)}
+                    <button key={min} onClick={() => set("spieldauer", aktiv ? "" : String(min))}
                       className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${aktiv ? "bg-brand-50 text-brand-800 border-brand-300 font-semibold" : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
                       {aktiv ? "✓ " : ""}{min} min
                     </button>
                   );
                 })}
               </div>
-              <input type="number" placeholder="Eigene Dauer…" min={10} max={180} value={form.spieldauer} onChange={(e) => set("spieldauer", e.target.value)} className="input text-sm" />
+              <input type="text" placeholder="Eigene Dauer, z.B. 3 x 30 min…" value={form.spieldauer} onChange={(e) => set("spieldauer", e.target.value)} className="input text-sm" />
             </div>
             <div>
               <label className="label">Wichtige Infos</label>

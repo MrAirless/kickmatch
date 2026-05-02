@@ -157,11 +157,12 @@ function GameCard({ game, userLocation, onClick }) {
         <p className="font-semibold text-gray-900 text-base mb-0.5">{game.verein}</p>
         <p className="text-sm text-gray-500 mb-3">{mannschaft}</p>
         <div className="border-t border-gray-100 pt-3 flex flex-wrap gap-3">
-          <span className="text-xs text-gray-500">🕐 {game.uhrzeit} Uhr</span>
+          <span className="text-xs text-gray-500">🕐 {game.uhrzeit === 'flexibel' ? 'Flexibel' : `${game.uhrzeit} Uhr`}</span>
           {game.platz && <span className="text-xs text-gray-500">📍 {game.platz}</span>}
           <span className="text-xs text-gray-500">🌿 {game.rasen}</span>
           {game.spielfeld_groesse && <span className="text-xs text-gray-500">⬛ {game.spielfeld_groesse}</span>}
-          {game.spieldauer && <span className="text-xs text-gray-500">⏱️ {game.spieldauer} min</span>}
+          {game.spieldauer && <span className="text-xs text-gray-500">⏱️ {game.spieldauer}{/^\d+$/.test(String(game.spieldauer)) ? ' min' : ''}</span>}
+          {game.view_count > 0 && <span className="text-xs text-gray-400">👁 {game.view_count}</span>}
         </div>
         <div className="flex items-center gap-2 mt-2">
           <span className="text-xs text-gray-400">Spielstärke:</span>
@@ -201,7 +202,7 @@ function SchiriBörsenKarte({ game, userLocation, onBewerben }) {
         <div className="border-t border-gray-100 pt-3 flex flex-wrap gap-3 mb-4">
           <span className="text-xs text-gray-500">🕐 {game.uhrzeit} Uhr</span>
           {game.platz && <span className="text-xs text-gray-500">📍 {game.platz}</span>}
-          {game.spieldauer && <span className="text-xs text-gray-500">⏱️ {game.spieldauer} min</span>}
+          {game.spieldauer && <span className="text-xs text-gray-500">⏱️ {game.spieldauer}{/^\d+$/.test(String(game.spieldauer)) ? ' min' : ''}</span>}
         </div>
         {game.schiri_status !== "besetzt" ? (
           <button onClick={() => onBewerben(game)} className="w-full py-2.5 bg-amber-700 text-white rounded-lg text-sm font-semibold hover:bg-amber-800 transition-colors">
@@ -480,6 +481,7 @@ function EintragenTab({ onSubmit }) {
   const [staerke, setStaerke] = useState(3);
   const [umkreis, setUmkreis] = useState(30);
   const [schiriBenoetigt, setSchiriBenoetigt] = useState(false);
+  const [uhrzeitFlexibel, setUhrzeitFlexibel] = useState(false);
   const [laden, setLaden] = useState(false);
   const [form, setForm] = useState({
     datum: "", uhrzeit: "10:00", rasen: "Naturrasen",
@@ -505,10 +507,10 @@ function EintragenTab({ onSubmit }) {
   async function handleSubmit() {
     if (!form.datum || !form.trainer_name || !form.verein) { alert("Bitte Datum, Name und Verein ausfüllen."); return; }
     setLaden(true);
-    await onSubmit({ ...form, type, mannschaft, staerke, umkreis_km: type === "anfrage" ? umkreis : null, schiri_benoetigt: schiriBenoetigt, schiri_status: schiriBenoetigt ? "offen" : null });
+    await onSubmit({ ...form, type, mannschaft, staerke, umkreis_km: type === "anfrage" ? umkreis : null, schiri_benoetigt: schiriBenoetigt, schiri_status: schiriBenoetigt ? "offen" : null, uhrzeit: (type === "anfrage" && uhrzeitFlexibel) ? "flexibel" : form.uhrzeit, rasen: (type === "anfrage" && form.rasen === "Egal") ? "Egal" : form.rasen });
     setForm({ datum: "", uhrzeit: "10:00", rasen: "Naturrasen", platz: profile?.heimplatz || "", adresse: profile?.heimplatz_adresse || "", trainer_name: profile?.full_name || "", telefon: profile?.phone || "", verein: profile?.club_name || "", spielfeld_groesse: "", spieldauer: "", wichtige_infos: "" });
     profileApplied.current = false;
-    setType("angebot"); setMannschaft("E-Jugend (U10)"); setStaerke(3); setUmkreis(30); setSchiriBenoetigt(false);
+    setType("angebot"); setMannschaft("E-Jugend (U10)"); setStaerke(3); setUmkreis(30); setSchiriBenoetigt(false); setUhrzeitFlexibel(false);
     setLaden(false);
   }
 
@@ -536,11 +538,24 @@ function EintragenTab({ onSubmit }) {
         <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Spieldaten</p>
         <div className="grid grid-cols-2 gap-3">
           <div><label className="label">Datum</label><input type="date" className="input" value={form.datum} onChange={(e) => set("datum", e.target.value)} /></div>
-          <div><label className="label">Uhrzeit</label><input type="time" className="input" value={form.uhrzeit} onChange={(e) => set("uhrzeit", e.target.value)} /></div>
+          <div>
+            <label className="label">Uhrzeit</label>
+            {type === "anfrage" && uhrzeitFlexibel
+              ? <div className="input text-sm text-gray-400 flex items-center">Flexibel</div>
+              : <input type="time" className="input" value={form.uhrzeit} onChange={(e) => set("uhrzeit", e.target.value)} />
+            }
+          </div>
         </div>
+        {type === "anfrage" && (
+          <label className="flex items-center gap-2 cursor-pointer -mt-1">
+            <input type="checkbox" checked={uhrzeitFlexibel} onChange={(e) => setUhrzeitFlexibel(e.target.checked)} className="w-4 h-4 accent-brand-600" />
+            <span className="text-sm text-gray-600">Uhrzeit flexibel / kein fester Termin</span>
+          </label>
+        )}
         <div>
           <label className="label">Rasenart</label>
           <select className="input" value={form.rasen} onChange={(e) => set("rasen", e.target.value)}>
+            {type === "anfrage" && <option value="Egal">Egal / flexibel</option>}
             {["Naturrasen", "Kunstrasen", "Hartplatz", "Halle"].map((r) => <option key={r}>{r}</option>)}
           </select>
         </div>
@@ -594,16 +609,16 @@ function EintragenTab({ onSubmit }) {
           <label className="label">Spieldauer (Minuten)</label>
           <div className="flex flex-wrap gap-1.5 mb-2">
             {[40, 50, 60, 70, 80, 90].map((min) => {
-              const aktiv = parseInt(form.spieldauer) === min;
+              const aktiv = form.spieldauer === String(min);
               return (
-                <button key={min} onClick={() => set("spieldauer", aktiv ? "" : min)}
+                <button key={min} onClick={() => set("spieldauer", aktiv ? "" : String(min))}
                   className={`px-3 py-1.5 rounded-lg text-xs border transition-colors ${aktiv ? "bg-brand-50 text-brand-800 border-brand-300 font-semibold" : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}>
                   {aktiv ? "✓ " : ""}{min} min
                 </button>
               );
             })}
           </div>
-          <input type="number" placeholder="Eigene Dauer…" min={10} max={180} value={form.spieldauer} onChange={(e) => set("spieldauer", e.target.value)} className="input text-sm" />
+          <input type="text" placeholder="Eigene Dauer, z.B. 3 x 30 min…" value={form.spieldauer} onChange={(e) => set("spieldauer", e.target.value)} className="input text-sm" />
         </div>
         <div>
           <label className="label">Wichtige Infos</label>
@@ -1169,7 +1184,7 @@ export default function Matches() {
       rasen: formData.rasen, staerke: formData.staerke, platz: formData.platz || null, adresse: formData.adresse || null,
       trainer_name: formData.trainer_name, telefon: formData.telefon, verein: formData.verein, status: "offen",
       umkreis_km: formData.umkreis_km || null, spielfeld_groesse: formData.spielfeld_groesse || null,
-      spieldauer: formData.spieldauer ? parseInt(formData.spieldauer) : null, wichtige_infos: formData.wichtige_infos || null,
+      spieldauer: formData.spieldauer || null, wichtige_infos: formData.wichtige_infos || null,
       schiri_benoetigt: formData.schiri_benoetigt || false, schiri_status: formData.schiri_status || null,
       lat, lng,
       anbieter_email: session.user.email,
@@ -1187,7 +1202,7 @@ export default function Matches() {
       rasen: formData.rasen, staerke: formData.staerke, platz: formData.platz || null, adresse: formData.adresse || null,
       trainer_name: formData.trainer_name, telefon: formData.telefon, verein: formData.verein,
       umkreis_km: formData.umkreis_km || null, spielfeld_groesse: formData.spielfeld_groesse || null,
-      spieldauer: formData.spieldauer ? parseInt(formData.spieldauer) : null, wichtige_infos: formData.wichtige_infos || null,
+      spieldauer: formData.spieldauer || null, wichtige_infos: formData.wichtige_infos || null,
       schiri_benoetigt: formData.schiri_benoetigt || false, schiri_status: formData.schiri_status || null,
       lat, lng,
     }).eq("id", gameId);

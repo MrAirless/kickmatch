@@ -117,10 +117,21 @@ export default function GameDetail() {
     return () => subscription.unsubscribe();
   }, []);
 
+  const viewTrackedRef = useRef(false);
+
   useEffect(() => {
     supabase.from("games").select("*").eq("id", id).single()
       .then(({ data }) => { setGame(data || null); setLaden(false); });
   }, [id]);
+
+  useEffect(() => {
+    if (!game || !session || viewTrackedRef.current) return;
+    if (game.anbieter_email === session.user.email) return;
+    viewTrackedRef.current = true;
+    supabase.rpc('increment_view_count', { game_id: id }).then(() => {
+      setGame(g => g ? { ...g, view_count: (g.view_count || 0) + 1 } : g);
+    });
+  }, [game?.id, session?.user?.id]);
 
   useEffect(() => {
     if (!game || !session) return;
@@ -232,7 +243,7 @@ export default function GameDetail() {
       rasen: formData.rasen, staerke: formData.staerke, platz: formData.platz || null, adresse: formData.adresse || null,
       trainer_name: formData.trainer_name, telefon: formData.telefon, verein: formData.verein,
       umkreis_km: formData.umkreis_km || null, spielfeld_groesse: formData.spielfeld_groesse || null,
-      spieldauer: formData.spieldauer ? parseInt(formData.spieldauer) : null,
+      spieldauer: formData.spieldauer || null,
       wichtige_infos: formData.wichtige_infos || null,
       schiri_benoetigt: formData.schiri_benoetigt || false, schiri_status: formData.schiri_status || null,
     }).eq("id", gameId);
@@ -361,11 +372,12 @@ export default function GameDetail() {
 
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
             <InfoRow label="Datum" value={formatDate(game.datum)} />
-            <InfoRow label="Anpfiff" value={`${game.uhrzeit} Uhr`} />
+            <InfoRow label="Anpfiff" value={game.uhrzeit === 'flexibel' ? 'Flexibel' : `${game.uhrzeit} Uhr`} />
             <InfoRow label="Mannschaft" value={mannschaft} />
             <InfoRow label="Rasenart" value={game.rasen} />
             {game.spielfeld_groesse && <InfoRow label="Spielfeld" value={game.spielfeld_groesse} />}
-            {game.spieldauer && <InfoRow label="Spieldauer" value={`${game.spieldauer} Minuten`} />}
+            {game.spieldauer && <InfoRow label="Spieldauer" value={/^\d+$/.test(String(game.spieldauer)) ? `${game.spieldauer} Minuten` : game.spieldauer} />}
+            {game.view_count > 0 && <InfoRow label="Aufrufe" value={`👁 ${game.view_count}`} />}
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
               <span className="text-sm text-gray-500">Spielstärke</span>
               <div className="flex items-center gap-2">
