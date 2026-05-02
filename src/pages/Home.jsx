@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../lib/supabase'
 
 const PLANS = [
   {
@@ -72,6 +73,14 @@ export default function Home() {
   const { user } = useAuth()
   const [loading, setLoading] = useState(null)
   const [checkoutError, setCheckoutError] = useState('')
+  const [offeneAnfragen, setOffeneAnfragen] = useState(0)
+
+  useEffect(() => {
+    if (!user) return
+    supabase.from('buchungen').select('id', { count: 'exact', head: true })
+      .eq('anbieter_email', user.email).eq('status', 'angefragt')
+      .then(({ count }) => setOffeneAnfragen(count || 0))
+  }, [user?.email])
 
   async function handleSubscribe(plan) {
     if (plan.id === 'individuell') { window.location.href = '/kontakt'; return }
@@ -114,6 +123,14 @@ export default function Home() {
             <>
               <Link to="/spiele" className="btn-primary text-base px-6 py-3">Spiele durchsuchen</Link>
               <Link to="/spiele?tab=neu" className="btn-secondary text-base px-6 py-3">+ Eintragen</Link>
+              <Link to="/spiele?tab=meine" className="relative btn-secondary text-base px-6 py-3">
+                Anfragen
+                {offeneAnfragen > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold px-1">
+                    {offeneAnfragen}
+                  </span>
+                )}
+              </Link>
             </>
           ) : (
             <>
