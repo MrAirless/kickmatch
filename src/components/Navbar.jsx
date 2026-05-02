@@ -56,7 +56,7 @@ export default function Navbar() {
     if (!user || istSchiri) return
     if (markingReadRef.current) return
     const { data } = await supabase.from("notifications")
-      .select("*").eq("user_id", user.id).eq("read", false)
+      .select("*").eq("user_email", user.email).eq("read", false)
       .order("created_at", { ascending: false })
     setBenachrichtigungen(data || [])
   }
@@ -87,11 +87,11 @@ export default function Navbar() {
     const channel = supabase.channel('navbar-notifications')
       .on('postgres_changes', {
         event: 'INSERT', schema: 'public', table: 'notifications',
-        filter: `user_id=eq.${user.id}`,
+        filter: `user_email=eq.${user.email}`,
       }, () => ladeBenachrichtigungen())
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'notifications',
-        filter: `user_id=eq.${user.id}`,
+        filter: `user_email=eq.${user.email}`,
       }, () => ladeBenachrichtigungen())
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
         if (payload.new.sender_email !== user.email) ladeChatNotifications()
@@ -128,7 +128,7 @@ export default function Navbar() {
 
   async function alleGelesen() {
     markingReadRef.current = true
-    await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false)
+    await supabase.from("notifications").update({ read: true }).eq("user_email", user.email).eq("read", false)
     const gameIds = [...new Set(ungelesenChat.map((m) => m.game_id))]
     gameIds.forEach((gid) => chatAlsGelesenMarkieren(gid))
     setBenachrichtigungen([])

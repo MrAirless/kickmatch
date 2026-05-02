@@ -1199,14 +1199,14 @@ export default function Matches() {
     const { data: aktuelleBuchungen } = await supabase.from("buchungen").select("*").eq("game_id", gameId);
     const { error } = await supabase.from("games").update({ status: "offen" }).eq("id", gameId);
     if (error) { alert("Fehler: " + error.message); return; }
-    await supabase.from("buchungen").update({ status: "angefragt", bucher_gelesen: false }).eq("game_id", gameId);
+    await supabase.from("buchungen").update({ status: "angefragt" }).eq("game_id", gameId);
     if (aktuelleBuchungen) {
       aktuelleBuchungen.filter((b) => b.status === "angenommen" && b.bucher_email).forEach((b) => {
-        supabase.rpc('create_notification', {
-          p_user_email: b.bucher_email, p_game_id: String(gameId),
-          p_type: 'wieder_offen', p_title: 'Spiel wieder offen',
-          p_message: `${b.datum}`,
-        }).catch(() => {})
+        supabase.from('notifications').insert([{
+          user_email: b.bucher_email, game_id: String(gameId),
+          type: 'wieder_offen', title: 'Spiel wieder offen',
+          message: `${b.datum}`,
+        }]).then(() => {}).catch(() => {})
         fetch('/api/send-push', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
