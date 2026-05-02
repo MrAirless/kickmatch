@@ -42,7 +42,8 @@ export default function Navbar() {
   const location = useLocation()
   const [menuOpen, setMenuOpen] = useState(false)
   const [glockeOffen, setGlockeOffen] = useState(false)
-  const glockeRef = useRef(null)
+  const glockeDesktopRef = useRef(null)
+  const glockeMobileRef = useRef(null)
   const markingReadRef = useRef(false)
 
   const rolle = user?.user_metadata?.rolle || 'trainer'
@@ -103,7 +104,9 @@ export default function Navbar() {
 
   useEffect(() => {
     function handleClick(e) {
-      if (glockeRef.current && !glockeRef.current.contains(e.target)) setGlockeOffen(false)
+      const inDesktop = glockeDesktopRef.current && glockeDesktopRef.current.contains(e.target)
+      const inMobile = glockeMobileRef.current && glockeMobileRef.current.contains(e.target)
+      if (!inDesktop && !inMobile) setGlockeOffen(false)
     }
     document.addEventListener("mousedown", handleClick)
     return () => document.removeEventListener("mousedown", handleClick)
@@ -199,7 +202,7 @@ export default function Navbar() {
           {user ? (
             <>
               {!istSchiri && (
-                <div ref={glockeRef} className="relative">
+                <div ref={glockeDesktopRef} className="relative">
                   <button onClick={() => setGlockeOffen((o) => !o)} className="relative p-2 text-gray-400 hover:text-gray-700 transition-colors">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
@@ -227,7 +230,7 @@ export default function Navbar() {
 
         <div className="flex md:hidden items-center gap-2">
           {user && !istSchiri && (
-            <div ref={glockeRef} className="relative">
+            <div ref={glockeMobileRef} className="relative">
               <button onClick={() => setGlockeOffen((o) => !o)} className="relative p-2 text-gray-400 hover:text-gray-700 transition-colors">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" />
