@@ -115,20 +115,20 @@ export default function Navbar() {
     setUngelesenChat((prev) => prev.filter((m) => m.game_id !== gameId))
   }
 
-  async function handleNotificationClick(b) {
+  function handleNotificationClick(b) {
+    setGlockeOffen(false)
     if (b._rolle === 'chat') {
       chatAlsGelesenMarkieren(b.game_id)
     } else {
-      await supabase.from("notifications").update({ read: true }).eq("id", b.id)
-      setBenachrichtigungen(prev => prev.filter(n => n.id !== b.id))
+      supabase.from("notifications").update({ read: true }).eq("id", b.id)
+        .then(() => setBenachrichtigungen(prev => prev.filter(n => n.id !== b.id)))
     }
-    setGlockeOffen(false)
-    navigate(`/spiele/${b.game_id}`)
+    if (b.game_id) navigate(`/spiele/${b.game_id}`)
   }
 
   async function alleGelesen() {
     markingReadRef.current = true
-    await supabase.rpc('mark_all_notifications_read')
+    await supabase.from("notifications").update({ read: true }).eq("user_id", user.id).eq("read", false)
     const gameIds = [...new Set(ungelesenChat.map((m) => m.game_id))]
     gameIds.forEach((gid) => chatAlsGelesenMarkieren(gid))
     setBenachrichtigungen([])
