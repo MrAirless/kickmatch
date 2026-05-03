@@ -52,10 +52,22 @@ function ChatBox({ gameId, session, senderName }) {
     setSending(false);
   }
 
+  async function handleClearChat() {
+    if (!window.confirm("Chat wirklich leeren? Alle Nachrichten werden gelöscht.")) return;
+    const { error } = await supabase.from("messages").delete().eq("game_id", gameId);
+    if (error) { alert("Fehler beim Leeren: " + error.message); return; }
+    setMessages([]);
+  }
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-100">
+      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
         <span className="font-semibold text-gray-900 text-sm">Chat</span>
+        {messages.length > 0 && (
+          <button onClick={handleClearChat} className="text-xs text-gray-400 hover:text-red-500 transition-colors">
+            🗑 Leeren
+          </button>
+        )}
       </div>
       <div className="h-64 overflow-y-auto p-4 space-y-3 bg-gray-50">
         {messages.length === 0 ? (
